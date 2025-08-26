@@ -1,0 +1,115 @@
+#!/bin/bash
+#SBATCH --job-name=AF3_inference_small
+#SBATCH --cpus-per-task=8
+#SBATCH --time=06:00:00
+#SBATCH --ntasks=1
+#SBATCH --partition=leinegpu_lowprio
+#SBATCH --gres=gpu:a100-40g:1
+#SBATCH --threads-per-core=1                    # Disable Multithreading
+#SBATCH --hint=nomultithread
+#SBATCH --output=slurm-output/slurm-%A_%a-%x.out # %j (Job ID) %x (Job Name)
+echo "Job ran on:" $(hostname)
+echo ""
+
+INFERENCE_ID=$(( SLURM_ARRAY_TASK_ID + START_OFFSET ))
+scontrol update jobid=${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID} comment="Task $((INFERENCE_ID + 1)) of ${TOTAL_INFERENCE_JOBS}"
+
+# Compute start and end of the bucket
+bucket_start=$(( (INFERENCE_ID / RESULTS_PER_DIR) * RESULTS_PER_DIR ))
+bucket_end=$(( bucket_start + RESULTS_PER_DIR - 1 ))
+
+# Handle last bucket
+LAST_INFERENCE_ID=$(( SLURM_ARRAY_TASK_MAX + START_OFFSET ))
+if [ $bucket_end -gt $LAST_INFERENCE_ID ]; then
+    bucket_end=$LAST_INFERENCE_ID
+fi
+
+# --- Only the first task handles submitting the next chunk ---
+if [[ "$SLURM_ARRAY_TASK_ID" -eq 0 ]]; then
+    next_start=$(( START_OFFSET + SLURM_ARRAY_TASK_COUNT ))
+    if (( next_start < TOTAL_INFERENCE_JOBS )); then
+        next_end=$(( next_start + OUR_ARRAY_SIZE - 1 ))
+        if (( next_end >= TOTAL_INFERENCE_JOBS )); then
+            next_end=$(( TOTAL_INFERENCE_JOBS - 1 ))
+        fi
+        # Submit the next chunk
+        sbatch --array=0-$(( next_end - next_start )) \
+               --dependency=afterok:${SLURM_ARRAY_JOB_ID} \
+               --export=TOTAL_INFERENCE_JOBS,OUR_ARRAY_SIZE,START_OFFSET=$next_start,RESULTS_PER_DIR,STATISTICS_FILE $0
+        echo "Submitted next chunk: $next_start-$next_end (dependent on job ${SLURM_ARRAY_JOB_ID})"
+    fi
+fi
+# -- End of Task-0 block --
+
+
+WORKDIR=$(pwd)
+user_input_file=$WORKDIR/pending_jobs/small/${INFERENCE_ID}_*.json
+AF3_input_file=$(basename $user_input_file)
+AF3_input_path=$WORKDIR/tmp/input_${SLURM_ARRAY_JOB_ID}/${SLURM_ARRAY_TASK_ID}
+AF3_output_path=$WORKDIR/results/${SLURM_ARRAY_JOB_ID}_${bucket_start}-${bucket_end}
+AF3_cache_path=$WORKDIR/tmp/af3_cache_${SLURM_ARRAY_JOB_ID}/${SLURM_ARRAY_TASK_ID} # Cache directory
+export APPTAINER_TMPDIR=$WORKDIR/tmp/apptainer_${SLURM_ARRAY_JOB_ID}/${SLURM_ARRAY_TASK_ID}
+alphaplots3_path=/hpc/project/bpc/alphaplots3/alphaplots3.py
+
+######### Do not change this(!) #########
+AF3_root=/leinesw/software/user/alphafold3
+AF3_model_path=${AF3_root}/model
+AF3_db_path=${AF3_root}/db
+AF3_container_path=${AF3_root}/container
+
+mkdir -p "$AF3_input_path" && mv $user_input_file "$AF3_input_path"
+mkdir -p "$AF3_cache_path"
+mkdir -p "$APPTAINER_TMPDIR"
+mkdir -p "$AF3_output_path"
+python3 utilities/copy_dependency_files.py "$AF3_input_path"/"$AF3_input_file" "$AF3_input_path"
+
+export APPTAINER_BINDPATH="/${AF3_input_path}:/root/af_input,${AF3_output_path}:/root/af_output,${AF3_model_path}:/root/models,${AF3_db_path}:/root/public_databases,${AF3_cache_path}:/root/jax_cache_dir"
+
+# Extract the protein name from the JSON
+NAME=$(jq -r '.name' "$AF3_input_path"/"$AF3_input_file")
+
+echo "Running AlphaFold job for ${NAME} (index ${SLURM_ARRAY_TASK_ID}, total-index: ${INFERENCE_ID})"
+
+start_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+af_output=$(apptainer exec --writable-tmpfs --nv ${AF3_container_path}/alphafold3.1.sif python /app/alphafold/run_alphafold.py \
+    --run_data_pipeline=false \
+    --json_path=/root/af_input/${AF3_input_file} \
+    --model_dir=/root/models \
+    --output_dir=/root/af_output \
+    --mgnify_database_path=/root/public_databases/mgy_clusters_2022_05.fa \
+    --ntrna_database_path=/root/public_databases/nt_rna_2023_02_23_clust_seq_id_90_cov_80_rep_seq.fasta \
+    --pdb_database_path=/root/public_databases/mmcif_files \
+    --rfam_database_path=/root/public_databases/rfam_14_9_clust_seq_id_90_cov_80_rep_seq.fasta \
+    --rna_central_database_path=/root/public_databases/rnacentral_active_seq_id_90_cov_80_linclust.fasta \
+    --seqres_database_path=/root/public_databases/pdb_seqres_2022_09_28.fasta \
+    --small_bfd_database_path=/root/public_databases/bfd-first_non_consensus_sequences.fasta \
+    --uniprot_cluster_annot_database_path=/root/public_databases/uniprot_all_2021_04.fa \
+    --uniref90_database_path=/root/public_databases/uniref90_2022_05.fa \
+    --jackhmmer_n_cpu=$SLURM_CPUS_PER_TASK \
+    --jax_compilation_cache_dir=/root/jax_cache_dir \
+2>&1 | tee -a "slurm-output/slurm-${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}-${SLURM_JOB_NAME}.out")
+
+end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+read bucket_size tokens < <(echo "$af_output" | awk '/Got bucket size/ {
+    match($0, /Got bucket size ([0-9]+) for input with ([0-9]+)/, a);
+    print a[1], a[2];
+    exit
+}')
+
+read iptm ptm ranking_score < <(
+    jq -r '[.iptm, .ptm, .ranking_score] | @tsv' "${AF3_output_path}/${NAME}/${NAME}_summary_confidences.json"
+)
+
+# write statistics
+echo "Small,${INFERENCE_ID},${NAME},${SLURM_ARRAY_JOB_ID},${SLURM_ARRAY_TASK_ID},$(hostname),${tokens},${bucket_size},${iptm},${ptm},${ranking_score},${start_time},${end_time}" >> $STATISTICS_FILE
+
+rm -rf $AF3_cache_path
+rm -rf $APPTAINER_TMPDIR
+rm -rf $AF3_input_path
+
+python3 $alphaplots3_path ${AF3_output_path}/${NAME} --sort=rank
+
+mkdir -p ${AF3_output_path}/_PAEs
+mv ${AF3_output_path}/${NAME}/master_pae.png ${AF3_output_path}/_PAEs/${NAME}.png
+
