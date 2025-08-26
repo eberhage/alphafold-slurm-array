@@ -41,13 +41,13 @@ If redundant jobs occur (e.g. if `Protein_E` also appears in dimension 1 and `Pr
 ### Configuration
 The following parameters are set inside submit_data_pipeline.sh:
 
-| Variable          | Description                                                                                                                                            |
-|-------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `INPUT_FILE`      | Path to the input JSON file (default: `input.json`).                                                                                                   |
-| `SEEDS`           | Comma-separated AlphaFold seeds used for inference (default: `"0,1,2"`).                                                                               |
-| `RESULTS_PER_DIR` | Number of results to bundle per directory (default: `250`). Naming scheme: `results/<SLURM_ARRAY_JOB_ID>_x-y`.                                                     |
+| Variable          | Description                                                                                                                                                   |
+|-------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `INPUT_FILE`      | Path to the input JSON file (default: `input.json`).                                                                                                          |
+| `SEEDS`           | Comma-separated AlphaFold seeds used for inference (default: `"0,1,2"`).                                                                                      |
+| `RESULTS_PER_DIR` | Number of results to bundle per directory (default: `250`). Naming scheme: `results/<SLURM_ARRAY_JOB_ID>_x-y`.                                                |
 | `SORTING`         | How to order protein chains within a dimension:<br><ul><li>`alpha`: alphabetically by protein key</li><li>`input`: preserve order from `input.json`</li></ul> |
-| `STATISTICS_FILE` | CSV file where inference statistics will be stored (default: `statistics.csv`).                                                                        |
+| `STATISTICS_FILE` | CSV file where inference statistics will be stored (default: `statistics.csv`).                                                                               |
 
 
 ### Output
