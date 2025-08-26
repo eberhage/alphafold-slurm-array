@@ -89,7 +89,8 @@ These values are automatically collected into the statistics CSV file for downst
 
 ### Example Workflow
 
-- Prepare input (input.json) with your protein sequences.
+- Prepare input (`input.json`) with your protein sequences.
 - Adjust configuration inside `submit_data_pipeline.sh` if needed.
+- Check SBATCH-headers and contents of the `af3_<...>.sh` files in `utilities` for your cluster specific settings.
 - Submit the pipeline to your HPC cluster (SLURM).
 - Collect statistics from the generated `statistics.csv`.
