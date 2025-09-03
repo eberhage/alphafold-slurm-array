@@ -6,6 +6,7 @@
 # ------------------------------
 # Check required environment variables
 # ------------------------------
+echo "MODE = '$MODE'"
 echo "SEEDS = '$SEEDS'"
 echo "SORTING = '$SORTING'"
 echo "INPUT_FILE = '$INPUT_FILE'"
@@ -22,7 +23,7 @@ echo "size,inference_id,inference_name,job_id,task_id,node,tokens,bucket_size,ip
 # ------------------------------
 
 read SMALL_JOBS LARGE_JOBS < <(
-    python3 utilities/make_inference_inputs.py "$INPUT_FILE" --seeds "$SEEDS" --sorting "$SORTING"
+    python3 utilities/make_inference_inputs.py "$INPUT_FILE" --seeds "$SEEDS" --sorting "$SORTING" --mode "$MODE"
 )
 echo "Small jobs (Tokens <= 3072): $SMALL_JOBS"
 echo "Large jobs (Tokens > 3072): $LARGE_JOBS"

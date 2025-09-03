@@ -47,6 +47,8 @@ def parse_args():
                    help="Comma-separated list of model seeds (e.g. 0,1,2).")
     p.add_argument("--sorting", dest="sorting", choices=["alpha", "input"], default="input",
                    help="Sort proteins within each dimension alphabetically ('alpha') or keep input order ('input').")
+    p.add_argument("--mode", dest="mode", choices=["cartesian", "collapsed"], required=True,
+                   help="Job generation mode: 'cartesian' (all combinations) or 'collapsed' (one job per dimension).")
     return p.parse_args()
 
 def chain_id(idx: int) -> str:
@@ -114,7 +116,13 @@ def main():
     small_index = 0
     large_index = 0
 
-    for choice in itertools.product(*key_lists):
+    if args.mode == "cartesian":
+        iterator = itertools.product(*key_lists)
+    elif args.mode == "collapsed":
+        # One job per dimension
+        iterator = key_lists
+
+    for choice in iterator:
         canon = tuple(sorted(choice))
         if canon in seen:
             continue

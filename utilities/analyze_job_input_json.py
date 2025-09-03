@@ -2,12 +2,17 @@ import json
 import itertools
 import sys
 
-# Step 0: Read the JSON file path from command-line arguments
-if len(sys.argv) != 2:
-    print(f"Usage: python {sys.argv[0]} <json_file_path>")
+# Step 0: Read JSON file path and MODE from command-line arguments
+if len(sys.argv) != 3:
+    print(f"Usage: python {sys.argv[0]} <json_file_path> <mode>")
     sys.exit(1)
 
 json_file_path = sys.argv[1]
+MODE = sys.argv[2].lower()
+
+if MODE not in ("cartesian", "collapsed"):
+    print(f"ERROR: MODE must be 'cartesian' or 'collapsed'. Got '{MODE}'")
+    sys.exit(1)
 
 # Step 1: Read the JSON file
 with open(json_file_path, 'r') as f:
@@ -44,11 +49,17 @@ unique_proteins_count = len(global_protein_sequences)
 # Step 6: Calculate unique jobs
 protein_lists = [list(dimension.keys()) for dimension in data]
 
-all_combinations = itertools.product(*protein_lists)
-
-# Deduplicate combinations by sorting proteins (order doesn't matter)
-unique_jobs = {tuple(sorted(comb)) for comb in all_combinations}
-unique_jobs_count = len(unique_jobs)
+if MODE == "cartesian":
+    # Cartesian product across all dimensions
+    all_combinations = itertools.product(*protein_lists)
+    # Deduplicate combinations (order doesn't matter)
+    unique_jobs = {tuple(sorted(comb)) for comb in all_combinations}
+    unique_jobs_count = len(unique_jobs)
+elif MODE == "collapsed":
+    # Each dimension collapsed into a single job (product of elements)
+    # Each dimension's job is the sorted tuple of its proteins
+    unique_jobs = {tuple(sorted(dim)) for dim in protein_lists}
+    unique_jobs_count = len(unique_jobs)
 
 # Step 7: Output results
 print(f"{unique_proteins_count} {unique_jobs_count}")

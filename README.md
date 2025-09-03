@@ -1,7 +1,9 @@
 # AlphaFold SLURM Array
 
-This repository provides a wrapper around **AlphaFold** to run large numbers of inference jobs in a systematic and reproducible way on HPCs with SLURM.  
-It is designed for **Cartesian product exploration** of protein sequence combinations, where each dimension represents a set of proteins.
+This repository provides a wrapper around **AlphaFold** to run large numbers of inference jobs in a systematic and reproducible way on HPCs with SLURM.
+It supports two exploration strategies for protein sequence combinations. Each **dimension** represents a set of proteins.
+- `cartesian`: exhaustive Cartesian product exploration across dimensions → Proteins in the same dimension will **never** be part of the same job.
+- `collapsed`: one job per dimension, without crossing combinations → **Only** Proteins in the same dimension are part of the same job.
 
 ---
 
@@ -9,10 +11,6 @@ It is designed for **Cartesian product exploration** of protein sequence combina
 
 The input to the pipeline is a JSON file (`input.json`) containing a **list of dictionaries**.  
 Each dictionary defines one **dimension vector**, where every entry is a `"Protein_Name":"AA_Sequence"` pair.
-
-- The Cartesian product of all dimensions defines the jobs to run.  
-- Redundant jobs (e.g. permuted chain orders leading to identical complexes) are automatically removed.  
-- Each job is run with the specified AlphaFold seeds.
 
 ### Example
 
@@ -32,11 +30,24 @@ Each dictionary defines one **dimension vector**, where every entry is a `"Prote
   }
 ]
 ```
-This input will produce 6 jobs:
 
-ADE, ADF, BDE, BDF, CDE, CDF
+### Mode
+The behavior of the pipeline is controlled by the `MODE` parameter.
+- `cartesian`
+	The Cartesian product of all dimensions defines the jobs to run.   
+	Each job is run with the specified AlphaFold seeds.
 
-If redundant jobs occur (e.g. if `Protein_E` also appears in dimension 1 and `Protein_A` in dimension 3), jobs like EDA and ADE are treated as one unique job.
+	The example above will produce 6 jobs:
+
+	ADE, ADF, BDE, BDF, CDE, CDF
+
+	Redundant jobs (e.g. permuted chain orders leading to identical complexes) are automatically removed.
+- `collapsed`
+	Each dimension is treated independently and produces exactly one job (if not a duplicate of a different dimension).
+
+	The example above will produce 3 jobs:
+
+	ABC, D, EF
 
 ### Configuration
 The following parameters are set inside submit_data_pipeline.sh:
@@ -44,6 +55,7 @@ The following parameters are set inside submit_data_pipeline.sh:
 | Variable          | Description                                                                                                                                                   |
 |-------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `INPUT_FILE`      | Path to the input JSON file (default: `input.json`).                                                                                                          |
+| `MODE`            | Job generation mode:<ul><li>`cartesian`: full cross-product between dimensions</li><li>`collapsed`: one job per dimension</li></ul>                           |
 | `SEEDS`           | Comma-separated AlphaFold seeds used for inference (default: `"0,1,2"`).                                                                                      |
 | `RESULTS_PER_DIR` | Number of results to bundle per directory (default: `250`). Naming scheme: `results/<SLURM_ARRAY_JOB_ID>_x-y`.                                                |
 | `SORTING`         | How to order protein chains within a dimension:<br><ul><li>`alpha`: alphabetically by protein key</li><li>`input`: preserve order from `input.json`</li></ul> |
