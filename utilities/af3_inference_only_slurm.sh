@@ -1,10 +1,9 @@
 #!/bin/bash
-#SBATCH --job-name=AF3_inference_small
+#SBATCH --job-name=AF3_inference
 #SBATCH --cpus-per-task=8
 #SBATCH --time=06:00:00
 #SBATCH --ntasks=1
 #SBATCH --partition=leinegpu_lowprio
-#SBATCH --gres=gpu:a100-40g:1
 #SBATCH --threads-per-core=1                    # Disable Multithreading
 #SBATCH --hint=nomultithread
 #SBATCH --output=slurm-output/slurm-%A_%a-%x.out # %j (Job ID) %x (Job Name)
@@ -39,17 +38,15 @@ if [[ "$SLURM_ARRAY_TASK_ID" -eq 0 ]]; then
         echo "Submitted next chunk: $next_start-$next_end (dependent on job ${SLURM_ARRAY_JOB_ID})"
     fi
 fi
-# -- End of Task-0 block --
-
+# --- End of Task-0 block ---
 
 WORKDIR=$(pwd)
-user_input_file=$WORKDIR/pending_jobs/small/${INFERENCE_ID}_*.json
+user_input_file=$WORKDIR/pending_jobs/${JOB_SIZE}/${INFERENCE_ID}_*.json
 AF3_input_file=$(basename $user_input_file)
 AF3_input_path=$WORKDIR/tmp/input_${SLURM_ARRAY_JOB_ID}/${SLURM_ARRAY_TASK_ID}
 AF3_output_path=$WORKDIR/results/${SLURM_ARRAY_JOB_ID}_${bucket_start}-${bucket_end}
 AF3_cache_path=$WORKDIR/tmp/af3_cache_${SLURM_ARRAY_JOB_ID}/${SLURM_ARRAY_TASK_ID} # Cache directory
 export APPTAINER_TMPDIR=$WORKDIR/tmp/apptainer_${SLURM_ARRAY_JOB_ID}/${SLURM_ARRAY_TASK_ID}
-alphaplots3_path=/hpc/project/bpc/alphaplots3/alphaplots3.py
 
 ######### Do not change this(!) #########
 AF3_root=/leinesw/software/user/alphafold3
@@ -108,8 +105,5 @@ rm -rf $AF3_cache_path
 rm -rf $APPTAINER_TMPDIR
 rm -rf $AF3_input_path
 
-python3 $alphaplots3_path ${AF3_output_path}/${NAME} --sort=rank
-
-mkdir -p ${AF3_output_path}/_PAEs
-mv ${AF3_output_path}/${NAME}/master_pae.png ${AF3_output_path}/_PAEs/${NAME}.png
-
+# --- Post processing with alphaplots ---
+sbatch --output="slurm-output/slurm-${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}-${SLURM_JOB_NAME}.out" $WORKDIR/utilities/alphaplots_slurm.sh  "$AF3_output_path" "$NAME"

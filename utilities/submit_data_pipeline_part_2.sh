@@ -43,8 +43,9 @@ if [[ $SMALL_JOBS -gt 0 ]]; then
     FIRST_CHUNK_SIZE_SMALL=$(( SMALL_JOBS < OUR_ARRAY_SIZE ? SMALL_JOBS : OUR_ARRAY_SIZE ))
     echo "Submitting small inference jobs (0-$((FIRST_CHUNK_SIZE_SMALL - 1)))."
     sbatch --array=0-$(( FIRST_CHUNK_SIZE_SMALL - 1 )) \
-           --export=TOTAL_INFERENCE_JOBS=$SMALL_JOBS,OUR_ARRAY_SIZE,RESULTS_PER_DIR,STATISTICS_FILE,START_OFFSET=0 \
-           utilities/af3_inference_only_slurm_small.sh
+           --export=TOTAL_INFERENCE_JOBS=$SMALL_JOBS,OUR_ARRAY_SIZE,RESULTS_PER_DIR,STATISTICS_FILE,START_OFFSET=0,JOB_SIZE=small \
+           --gres=gpu:a100-40g:1 \
+           utilities/af3_inference_only_slurm.sh
 else
     echo "No small inference jobs to submit."
 fi
@@ -54,8 +55,9 @@ if [[ $LARGE_JOBS -gt 0 ]]; then
     FIRST_CHUNK_SIZE_LARGE=$(( LARGE_JOBS < OUR_ARRAY_SIZE ? LARGE_JOBS : OUR_ARRAY_SIZE ))
     echo "Submitting large inference jobs (0-$((FIRST_CHUNK_SIZE_LARGE - 1)))."
     sbatch --array=0-$(( FIRST_CHUNK_SIZE_LARGE - 1 )) \
-           --export=TOTAL_INFERENCE_JOBS=$LARGE_JOBS,OUR_ARRAY_SIZE,RESULTS_PER_DIR,STATISTICS_FILE,START_OFFSET=0 \
-           utilities/af3_inference_only_slurm_large.sh
+           --export=TOTAL_INFERENCE_JOBS=$LARGE_JOBS,OUR_ARRAY_SIZE,RESULTS_PER_DIR,STATISTICS_FILE,START_OFFSET=0,JOB_SIZE=large \
+           --gres=gpu:a100-80g:1 \
+           utilities/af3_inference_only_slurm.sh
 else
     echo "No large inference jobs to submit."
 fi

@@ -52,6 +52,39 @@ if ! output=$(python3 utilities/analyze_job_input_json.py "$INPUT_FILE" "$MODE")
 fi
 
 read TOTAL_DATAPIPELINE_JOBS TOTAL_INFERENCE_JOBS <<< "$output"
+NUM_DIMENSIONS=$(jq 'length' "$INPUT_FILE")
+
+if [[ "$MODE" == "cartesian" ]]; then
+    MODE_DESC="all combinations across dimensions ('cartesian')"
+elif [[ "$MODE" == "collapsed" ]]; then
+    MODE_DESC="per-dimension products ('collapsed')"
+fi
+
+echo
+echo "$TOTAL_DATAPIPELINE_JOBS unique sequence(s) found across $NUM_DIMENSIONS dimension(s). Generating $TOTAL_INFERENCE_JOBS job(s) using mode: $MODE_DESC."
+echo
+
+read -r -p "Do you want to continue? [Y/n] " answer
+
+# Default to yes if empty
+answer="${answer:-y}"
+
+# Convert to lowercase for easier comparison
+answer=$(echo "$answer" | tr '[:upper:]' '[:lower:]')
+
+case "$answer" in
+    y|yes|ja|1)
+        echo "Continuing..."
+        ;;
+    n|no|nein|0)
+        echo "Aborting."
+        exit 1
+        ;;
+    *)
+        echo "Input not recognized. Aborting."
+        exit 1
+        ;;
+esac
 
 # Create output directories
 DATAPIPELINE_INPUT_DIR="data_pipeline_inputs"
@@ -76,8 +109,6 @@ else
     echo "ERROR: SORTING must be 'alpha' or 'input'" >&2
     exit 1
 fi
-
-NUM_DIMENSIONS=$(jq 'length' "$INPUT_FILE")
 
 # Loop over each entry and create numbered JSONs
 for IDX in "${!NAMES[@]}"; do
@@ -105,14 +136,6 @@ for IDX in "${!NAMES[@]}"; do
 }
 EOF
 done
-
-if [[ "$MODE" == "cartesian" ]]; then
-    MODE_DESC="all combinations across dimensions"
-elif [[ "$MODE" == "collapsed" ]]; then
-    MODE_DESC="per-dimension products"
-fi
-
-echo "$TOTAL_DATAPIPELINE_JOBS unique sequence(s) found across $NUM_DIMENSIONS dimension(s). Generating $TOTAL_INFERENCE_JOBS job(s) using mode: $MODE_DESC."
  
 export TOTAL_DATAPIPELINE_JOBS MAX_ARRAY_SIZE SEEDS INPUT_FILE SORTING TOTAL_INFERENCE_JOBS OUR_ARRAY_SIZE RESULTS_PER_DIR STATISTICS_FILE MODE
 
