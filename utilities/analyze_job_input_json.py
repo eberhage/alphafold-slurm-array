@@ -1,33 +1,48 @@
+import sys
+import re
 import json
 import itertools
-import sys
 
-# Step 0: Read JSON file path and MODE from command-line arguments
+VALID_AA = set("ACDEFGHIKLMNPQRSTVWY")
+VALID_FILENAME_REGEX = re.compile(r'^[A-Za-z0-9_-]+$')
+
+# Read arguments
 if len(sys.argv) != 3:
-    print(f"Usage: python {sys.argv[0]} <json_file_path> <mode>")
+    print(f"Usage: python {sys.argv[0]} <json_file_path> <mode>", file=sys.stderr)
     sys.exit(1)
 
 json_file_path = sys.argv[1]
 MODE = sys.argv[2].lower()
 
-if MODE not in ("cartesian", "collapsed"):
-    print(f"ERROR: MODE must be 'cartesian' or 'collapsed'. Got '{MODE}'")
-    sys.exit(1)
-
-# Step 1: Read the JSON file
 with open(json_file_path, 'r') as f:
     data = json.load(f)
 
-# Step 2: Validate structure
-if not isinstance(data, list):
-    raise ValueError("JSON must contain a list of dimensions (dictionaries).")
+error_found = False
 
-for dimension in data:
+if not isinstance(data, list):
+    print("ERROR: JSON must contain a list of dimensions (dictionaries).", file=sys.stderr)
+    sys.exit(1)
+
+if MODE not in ("cartesian", "collapsed"):
+    print(f"ERROR: MODE must be 'cartesian' or 'collapsed'. Got '{MODE}'", file=sys.stderr)
+    error_found = True
+
+for idx, dimension in enumerate(data):
     if not isinstance(dimension, dict):
-        raise ValueError("Each item must be a dimension (dictionary)")
+        print(f"ERROR: Dimension at index {idx} is not a dictionary.", file=sys.stderr)
+        error_found = True
+        continue
+
     for protein, sequence in dimension.items():
-        if sequence is None or not isinstance(sequence, str):
-            raise ValueError(f"Invalid sequence for protein '{protein}' in dimension: must be a non-empty string.")
+        if not isinstance(protein, str) or not VALID_FILENAME_REGEX.match(protein):
+            print(f"ERROR: Invalid protein name in dimension {idx}: '{protein}'", file=sys.stderr)
+            error_found = True
+        if not isinstance(sequence, str) or not sequence or not all(aa.upper() in VALID_AA for aa in sequence):
+            print(f"ERROR: Invalid sequence for protein '{protein}' in dimension {idx}: '{sequence}'", file=sys.stderr)
+            error_found = True
+
+if error_found:
+    sys.exit(1)
 
 # Step 3 & 4: Check protein uniqueness and consistent sequences
 global_protein_sequences = {}
