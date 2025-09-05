@@ -36,7 +36,7 @@ MODE="cartesian"                 # Options:
                                  #                  Use this mode if you want every dictionary in the JSON to be one AlphaFold job
                                  #
 SEEDS="0,1,2"                    # AlphaFold seeds for the inference step to be used for every job. Comma-separated string.
-RESULTS_PER_DIR=500              # Number of results to be bundled as one directory. Naming scheme: results/<job-id>_x-y
+RESULTS_PER_DIR=250              # Number of results to be bundled as one directory. Naming scheme: results/<job-id>_x-y
 SORTING="alpha"                  # Options: 'alpha' = use keys of INPUT_FILE alphabetically for the script logic, 'input' = preserve key order from INPUT_FILE.
 STATISTICS_FILE="statistics.csv" # Inference statistics file (no spaces in the filenames, please!)
 
