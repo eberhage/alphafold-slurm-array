@@ -99,7 +99,7 @@ read iptm ptm ranking_score < <(
 )
 
 # write statistics
-echo "Small,${INFERENCE_ID},${NAME},${SLURM_ARRAY_JOB_ID},${SLURM_ARRAY_TASK_ID},$(hostname),${tokens},${bucket_size},${iptm},${ptm},${ranking_score},${start_time},${end_time}" >> $STATISTICS_FILE
+echo "${JOB_SIZE},${INFERENCE_ID},${NAME},${SLURM_ARRAY_JOB_ID},${SLURM_ARRAY_TASK_ID},$(hostname),${tokens},${bucket_size},${iptm},${ptm},${ranking_score},${start_time},${end_time}" >> $STATISTICS_FILE
 
 rm -rf $AF3_cache_path
 rm -rf $APPTAINER_TMPDIR
