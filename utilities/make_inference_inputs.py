@@ -123,16 +123,17 @@ def main():
         iterator = key_lists
 
     for choice in iterator:
+        choice_tuple = tuple(choice)
         canon = tuple(sorted(choice))
         if canon in seen:
             continue
         seen.add(canon)
 
-        if len(canon) > 26:
+        if len(choice_tuple) > 26:
             raise ValueError("Job has more than 26 proteins, cannot assign chain IDs beyond Z.")
 
         sequences = []
-        for pos, protein in enumerate(canon):
+        for pos, protein in enumerate(choice_tuple):
             seq_obj = copy.deepcopy(protein_to_monomer_seqobj[protein])
 
             # Strict check for protein structure
@@ -142,7 +143,7 @@ def main():
             seq_obj["protein"]["id"] = chain_id(pos)
             sequences.append(seq_obj)
 
-        job_name = "_".join(canon)
+        job_name = "_".join(choice_tuple)
         job_data = {
             "dialect": "alphafold3",
             "version": 3,
