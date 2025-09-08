@@ -16,6 +16,18 @@ echo "RESULTS_PER_DIR = '$RESULTS_PER_DIR'"
 echo "STATISTICS_FILE = '$STATISTICS_FILE'"
 
 rm -rf data_pipeline_inputs
+
+# Rotate existing statistics file if it exists
+if [ -f "$STATISTICS_FILE" ]; then
+    backup="${STATISTICS_FILE}.old"
+    i=1
+    # Find the first unused backup name
+    while [ -f "$backup" ]; do
+        backup="${STATISTICS_FILE}.${i}.old"
+        i=$((i+1))
+    done
+    mv "$STATISTICS_FILE" "$backup"
+fi
 echo "size,inference_id,inference_name,job_id,task_id,node,tokens,bucket_size,iptm,ptm,ranking_score,start_time,end_time" > $STATISTICS_FILE
 
 # ------------------------------
