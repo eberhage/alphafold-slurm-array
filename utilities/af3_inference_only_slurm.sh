@@ -10,7 +10,7 @@
 echo "Job ran on:" $(hostname)
 echo ""
 
-INFERENCE_ID=$(( SLURM_ARRAY_TASK_ID + START_OFFSET ))
+export INFERENCE_ID=$(( SLURM_ARRAY_TASK_ID + START_OFFSET ))
 scontrol update jobid=${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID} comment="Task $((INFERENCE_ID + 1)) of ${TOTAL_INFERENCE_JOBS}"
 
 # Compute start and end of the bucket
@@ -23,6 +23,14 @@ if [ $bucket_end -gt $LAST_INFERENCE_ID ]; then
     bucket_end=$LAST_INFERENCE_ID
 fi
 
+WORKDIR=$(pwd)
+user_input_file=$WORKDIR/pending_jobs/${JOB_SIZE}/${INFERENCE_ID}_*.json
+AF3_input_file=$(basename $user_input_file)
+AF3_input_path=$WORKDIR/tmp/input_${SLURM_ARRAY_JOB_ID}/${SLURM_ARRAY_TASK_ID}
+AF3_output_path=$WORKDIR/results/${SLURM_ARRAY_JOB_ID}_${bucket_start}-${bucket_end}
+AF3_cache_path=$WORKDIR/tmp/af3_cache_${SLURM_ARRAY_JOB_ID}/${SLURM_ARRAY_TASK_ID} # Cache directory
+export APPTAINER_TMPDIR=$WORKDIR/tmp/apptainer_${SLURM_ARRAY_JOB_ID}/${SLURM_ARRAY_TASK_ID}
+
 # --- Only the first task handles submitting the next chunk ---
 if [[ "$SLURM_ARRAY_TASK_ID" -eq 0 ]]; then
     next_start=$(( START_OFFSET + SLURM_ARRAY_TASK_COUNT ))
@@ -33,20 +41,15 @@ if [[ "$SLURM_ARRAY_TASK_ID" -eq 0 ]]; then
         fi
         # Submit the next chunk
         sbatch --array=0-$(( next_end - next_start )) \
+               --partition=${INFERENCE_PARTITION} \
+               --gres=gpu:${GPU_TYPE}:1 \
                --dependency=afterok:${SLURM_ARRAY_JOB_ID} \
-               --export=TOTAL_INFERENCE_JOBS,OUR_ARRAY_SIZE,START_OFFSET=$next_start,RESULTS_PER_DIR,STATISTICS_FILE $0
+               --export=ALL,START_OFFSET=$next_start \
+               $WORKDIR/utilities/af3_inference_only_slurm.sh
         echo "Submitted next chunk: $next_start-$next_end (dependent on job ${SLURM_ARRAY_JOB_ID})"
     fi
 fi
 # --- End of Task-0 block ---
-
-WORKDIR=$(pwd)
-user_input_file=$WORKDIR/pending_jobs/${JOB_SIZE}/${INFERENCE_ID}_*.json
-AF3_input_file=$(basename $user_input_file)
-AF3_input_path=$WORKDIR/tmp/input_${SLURM_ARRAY_JOB_ID}/${SLURM_ARRAY_TASK_ID}
-AF3_output_path=$WORKDIR/results/${SLURM_ARRAY_JOB_ID}_${bucket_start}-${bucket_end}
-AF3_cache_path=$WORKDIR/tmp/af3_cache_${SLURM_ARRAY_JOB_ID}/${SLURM_ARRAY_TASK_ID} # Cache directory
-export APPTAINER_TMPDIR=$WORKDIR/tmp/apptainer_${SLURM_ARRAY_JOB_ID}/${SLURM_ARRAY_TASK_ID}
 
 ######### Do not change this(!) #########
 AF3_root=/leinesw/software/user/alphafold3
@@ -63,9 +66,10 @@ python3 utilities/copy_dependency_files.py "$AF3_input_path"/"$AF3_input_file" "
 export APPTAINER_BINDPATH="/${AF3_input_path}:/root/af_input,${AF3_output_path}:/root/af_output,${AF3_model_path}:/root/models,${AF3_db_path}:/root/public_databases,${AF3_cache_path}:/root/jax_cache_dir"
 
 # Extract the protein name from the JSON
-NAME=$(jq -r '.name' "$AF3_input_path"/"$AF3_input_file")
+export INFERENCE_NAME=$(jq -r '.name' "$AF3_input_path"/"$AF3_input_file")
+export INFERENCE_DIR=${AF3_output_path}/${INFERENCE_NAME}
 
-echo "Running AlphaFold job for ${NAME} (index ${SLURM_ARRAY_TASK_ID}, total-index: ${INFERENCE_ID})"
+echo "Running AlphaFold job for ${INFERENCE_NAME} (index ${SLURM_ARRAY_TASK_ID}, total-index: ${INFERENCE_ID})"
 
 start_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
@@ -87,23 +91,29 @@ af_output=$(apptainer exec --writable-tmpfs --nv ${AF3_container_path}/alphafold
     --jax_compilation_cache_dir=/root/jax_cache_dir \
 2>&1 | tee -a "slurm-output/slurm-${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}-${SLURM_JOB_NAME}.out")
 
-end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-read bucket_size tokens < <(echo "$af_output" | awk '/Got bucket size/ {
-    match($0, /Got bucket size ([0-9]+) for input with ([0-9]+)/, a);
-    print a[1], a[2];
-    exit
-}')
+if [[ -n "${INFERENCE_STATISTICS_FILE:-}" && -f "$INFERENCE_STATISTICS_FILE" ]]; then
+    end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    read bucket_size tokens < <(echo "$af_output" | awk '/Got bucket size/ {
+        match($0, /Got bucket size ([0-9]+) for input with ([0-9]+)/, a);
+        print a[1], a[2];
+        exit
+    }')
 
-read iptm ptm ranking_score < <(
-    jq -r '[.iptm, .ptm, .ranking_score] | @tsv' "${AF3_output_path}/${NAME}/${NAME}_summary_confidences.json"
-)
+    read iptm ptm ranking_score < <(
+        jq -r '[.iptm, .ptm, .ranking_score] | @tsv' "${INFERENCE_DIR}/${INFERENCE_NAME}_summary_confidences.json"
+    )
 
-# write statistics
-echo "${JOB_SIZE},${INFERENCE_ID},${NAME},${SLURM_ARRAY_JOB_ID},${SLURM_ARRAY_TASK_ID},$(hostname),${tokens},${bucket_size},${iptm},${ptm},${ranking_score},${start_time},${end_time}" >> $STATISTICS_FILE
+    # write statistics
+    echo "${JOB_SIZE},${INFERENCE_ID},${INFERENCE_NAME},${SLURM_ARRAY_JOB_ID},${SLURM_ARRAY_TASK_ID},$(hostname),${tokens},${bucket_size},${iptm},${ptm},${ranking_score},${start_time},${end_time}" >> $INFERENCE_STATISTICS_FILE
+fi
 
 rm -rf $AF3_cache_path
 rm -rf $APPTAINER_TMPDIR
 rm -rf $AF3_input_path
 
-# --- Post processing with alphaplots ---
-sbatch --output="slurm-output/slurm-${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}-${SLURM_JOB_NAME}.out" $WORKDIR/utilities/alphaplots_slurm.sh  "$AF3_output_path" "$NAME"
+# --- Postprocessing ---
+if [[ -n "${POSTPROCESSING_SCRIPT:-}" && -f "$POSTPROCESSING_SCRIPT" ]]; then
+    sbatch --output="slurm-output/slurm-${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}-${SLURM_JOB_NAME}.out" \
+           --open-mode=append \
+           ${POSTPROCESSING_SCRIPT}
+fi

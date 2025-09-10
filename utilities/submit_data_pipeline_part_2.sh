@@ -3,45 +3,34 @@
 #SBATCH --time=00:10:00
 #SBATCH --output=slurm-output/slurm-%j-%x.out # %j (Job ID) %x (Job Name)
 
-# ------------------------------
-# Check required environment variables
-# ------------------------------
-echo "MODE = '$MODE'"
-echo "SEEDS = '$SEEDS'"
-echo "SORTING = '$SORTING'"
-echo "INPUT_FILE = '$INPUT_FILE'"
-echo "TOTAL_INFERENCE_JOBS = '$TOTAL_INFERENCE_JOBS'"
-echo "OUR_ARRAY_SIZE = '$OUR_ARRAY_SIZE'"
-echo "RESULTS_PER_DIR = '$RESULTS_PER_DIR'"
-echo "STATISTICS_FILE = '$STATISTICS_FILE'"
-
 rm -rf data_pipeline_inputs
 
-# Rotate existing statistics file if it exists
-if [ -f "$STATISTICS_FILE" ]; then
-    backup="${STATISTICS_FILE}.old"
-    i=1
-    # Find the first unused backup name
-    while [ -f "$backup" ]; do
-        backup="${STATISTICS_FILE}.${i}.old"
-        i=$((i+1))
-    done
-    mv "$STATISTICS_FILE" "$backup"
+if [[ -n "${INFERENCE_STATISTICS_FILE:-}" ]]; then
+    # Rotate existing statistics file if it exists
+    if [ -f "$INFERENCE_STATISTICS_FILE" ]; then
+        backup="${INFERENCE_STATISTICS_FILE}.old"
+        i=1
+        # Find the first unused backup name
+        while [ -f "$backup" ]; do
+            backup="${INFERENCE_STATISTICS_FILE}.${i}.old"
+            i=$((i+1))
+        done
+        mv "$INFERENCE_STATISTICS_FILE" "$backup"
+    fi
+    echo "size,inference_id,inference_name,job_id,task_id,node,tokens,bucket_size,iptm,ptm,ranking_score,start_time,end_time" > "$INFERENCE_STATISTICS_FILE"
 fi
-echo "size,inference_id,inference_name,job_id,task_id,node,tokens,bucket_size,iptm,ptm,ranking_score,start_time,end_time" > $STATISTICS_FILE
 
 # ------------------------------
 # Phase 1: Run make_inference_inputs.py
 # ------------------------------
 
-read SMALL_JOBS LARGE_JOBS < <(
-    python3 utilities/make_inference_inputs.py "$INPUT_FILE" --seeds "$SEEDS" --sorting "$SORTING" --mode "$MODE"
-)
-echo "Small jobs (Tokens <= 3072): $SMALL_JOBS"
-echo "Large jobs (Tokens > 3072): $LARGE_JOBS"
+read SMALL_JOBS LARGE_JOBS TOO_BIG_JOBS < <(python3 utilities/make_inference_inputs.py)
+echo "Small jobs (Tokens ≤ ${SMALL_JOBS_UPPER_LIMIT}): $SMALL_JOBS"
+echo "Large jobs (${SMALL_JOBS_UPPER_LIMIT} < Tokens ≤ ${LARGE_JOBS_UPPER_LIMIT}): $LARGE_JOBS"
+echo "Too big jobs (Tokens > ${LARGE_JOBS_UPPER_LIMIT}): $TOO_BIG_JOBS"
 echo "Total jobs (calculated): $TOTAL_INFERENCE_JOBS"
 
-if [[ $TOTAL_INFERENCE_JOBS -ne $((SMALL_JOBS + LARGE_JOBS)) ]]; then
+if [[ $TOTAL_INFERENCE_JOBS -ne $((SMALL_JOBS + LARGE_JOBS + TOO_BIG_JOBS)) ]]; then
     echo "ERROR: Mismatch in job counts! Check the code and resubmit the job. Datapipeline data can be reused if unmoved and undeleted." >&2
     exit 1
 fi
@@ -50,26 +39,22 @@ fi
 # Phase 2: Submit inference jobs
 # ------------------------------
 
-# Small jobs
-if [[ $SMALL_JOBS -gt 0 ]]; then
-    FIRST_CHUNK_SIZE_SMALL=$(( SMALL_JOBS < OUR_ARRAY_SIZE ? SMALL_JOBS : OUR_ARRAY_SIZE ))
-    echo "Submitting small inference jobs (0-$((FIRST_CHUNK_SIZE_SMALL - 1)))."
-    sbatch --array=0-$(( FIRST_CHUNK_SIZE_SMALL - 1 )) \
-           --export=TOTAL_INFERENCE_JOBS=$SMALL_JOBS,OUR_ARRAY_SIZE,RESULTS_PER_DIR,STATISTICS_FILE,START_OFFSET=0,JOB_SIZE=small \
-           --gres=gpu:a100-40g:1 \
-           utilities/af3_inference_only_slurm.sh
-else
-    echo "No small inference jobs to submit."
-fi
+for job_size in small large; do
+    job_count_var="$(echo "${job_size^^}_JOBS")"   # e.g. SMALL_JOBS, LARGE_JOBS
+    gpu_type_var="$(echo "${job_size^^}_GPU")"     # e.g. SMALL_GPU, LARGE_GPU
 
-# Large jobs
-if [[ $LARGE_JOBS -gt 0 ]]; then
-    FIRST_CHUNK_SIZE_LARGE=$(( LARGE_JOBS < OUR_ARRAY_SIZE ? LARGE_JOBS : OUR_ARRAY_SIZE ))
-    echo "Submitting large inference jobs (0-$((FIRST_CHUNK_SIZE_LARGE - 1)))."
-    sbatch --array=0-$(( FIRST_CHUNK_SIZE_LARGE - 1 )) \
-           --export=TOTAL_INFERENCE_JOBS=$LARGE_JOBS,OUR_ARRAY_SIZE,RESULTS_PER_DIR,STATISTICS_FILE,START_OFFSET=0,JOB_SIZE=large \
-           --gres=gpu:a100-80g:1 \
-           utilities/af3_inference_only_slurm.sh
-else
-    echo "No large inference jobs to submit."
-fi
+    job_count="${!job_count_var}"
+    gpu_type="${!gpu_type_var}"
+
+    if [[ $job_count -gt 0 ]]; then
+        first_chunk_size=$(( job_count < OUR_ARRAY_SIZE ? job_count : OUR_ARRAY_SIZE ))
+        echo "Submitting ${job_size} inference jobs (0-$((first_chunk_size - 1)))."
+        sbatch --array=0-$(( first_chunk_size - 1 )) \
+               --partition="${INFERENCE_PARTITION}" \
+               --gres=gpu:${gpu_type}:1 \
+               --export=ALL,TOTAL_INFERENCE_JOBS=$job_count,START_OFFSET=0,JOB_SIZE=$job_size,GPU_TYPE=$gpu_type \
+               utilities/af3_inference_only_slurm.sh
+    else
+        echo "No ${job_size} inference jobs to submit."
+    fi
+done

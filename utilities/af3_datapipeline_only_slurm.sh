@@ -3,24 +3,11 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --time=02:00:00
 #SBATCH --ntasks=1
-#SBATCH --mail-type=FAIL,INVALID_DEPEND,TIME_LIMIT # (if you want) [ALL / BEGIN / END / FAIL]
 #SBATCH --threads-per-core=1                    # Disable Multithreading
 #SBATCH --hint=nomultithread
 #SBATCH --output=slurm-output/slurm-%A_%a-%x.out # %j (Job ID) %x (Job Name)
 echo "Job ran on:" $(hostname)
 echo ""
-
-# --- Input variables from --export ---
-START_OFFSET=${START_OFFSET:?}
-TOTAL_DATAPIPELINE_JOBS=${TOTAL_DATAPIPELINE_JOBS:?}
-MAX_ARRAY_SIZE=${MAX_ARRAY_SIZE:?}
-SEEDS=${SEEDS:?}
-INPUT_FILE=${INPUT_FILE:?}
-SORTING=${SORTING:?}
-TOTAL_INFERENCE_JOBS=${TOTAL_INFERENCE_JOBS:?}
-OUR_ARRAY_SIZE=${OUR_ARRAY_SIZE:?}
-RESULTS_PER_DIR=${RESULTS_PER_DIR:?}
-STATISTICS_FILE=${STATISTICS_FILE:?}
 
 DATA_PIPELINE_ID=$(( SLURM_ARRAY_TASK_ID + START_OFFSET ))
 scontrol update jobid=${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID} comment="Task $((DATA_PIPELINE_ID + 1)) of ${TOTAL_DATAPIPELINE_JOBS}"
@@ -33,22 +20,21 @@ AF3_output_path=$WORKDIR/monomer_data
 AF3_cache_path=$WORKDIR/tmp/af3_cache_${SLURM_ARRAY_JOB_ID}/${SLURM_ARRAY_TASK_ID} # Cache directory
 json_done_path=$WORKDIR/done
 export APPTAINER_TMPDIR=$WORKDIR/tmp/apptainer_${SLURM_ARRAY_JOB_ID}/${SLURM_ARRAY_TASK_ID}
-alphaplots3_path=/hpc/project/bpc/alphaplots3/alphaplots3.py
 
 # --- Task 0 only: decide what’s next ---
 if [[ "$SLURM_ARRAY_TASK_ID" -eq 0 ]]; then
     NEXT_OFFSET=$(( START_OFFSET + MAX_ARRAY_SIZE ))
 
-    if (( NEXT_OFFSET < N )); then
+    if (( NEXT_OFFSET < TOTAL_DATAPIPELINE_JOBS )); then
         echo "Submitting next datapipeline batch starting at offset $NEXT_OFFSET"
         sbatch --dependency=afterok:${SLURM_ARRAY_JOB_ID} \
+               --partition=${DATAPIPELINE_PARTITION} \
                --array=0-$(( MAX_ARRAY_SIZE < (TOTAL_DATAPIPELINE_JOBS - NEXT_OFFSET) ? MAX_ARRAY_SIZE-1 : (TOTAL_DATAPIPELINE_JOBS - NEXT_OFFSET)-1 )) \
-               --export=ALL,START_OFFSET=$NEXT_OFFSET,TOTAL_DATAPIPELINE_JOBS,MAX_ARRAY_SIZE,SEEDS,INPUT_FILE,SORTING,TOTAL_INFERENCE_JOBS,OUR_ARRAY_SIZE,RESULTS_PER_DIR,STATISTICS_FILE \
+               --export=ALL,START_OFFSET=$NEXT_OFFSET \
                $WORKDIR/utilities/af3_datapipeline_only_slurm.sh
     else
         echo "All datapipeline batches done. Continuing with pair-building and inference..."
         sbatch --dependency=afterok:${SLURM_ARRAY_JOB_ID} \
-               --export=ALL,SEEDS,INPUT_FILE,SORTING,TOTAL_INFERENCE_JOBS,OUR_ARRAY_SIZE,RESULTS_PER_DIR,STATISTICS_FILE \
                $WORKDIR/utilities/submit_data_pipeline_part_2.sh
     fi
 fi
@@ -76,6 +62,8 @@ export APPTAINER_BINDPATH="/${AF3_input_path}:/root/af_input,${AF3_output_path}:
 
 echo "Running AlphaFold job for ${NAME} (index ${SLURM_ARRAY_TASK_ID}, total index ${DATA_PIPELINE_ID})"
 
+start_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
 apptainer exec --writable-tmpfs --nv ${AF3_container_path}/alphafold3.1.sif python /app/alphafold/run_alphafold.py \
     --run_inference=false \
     --json_path=/root/af_input/${AF3_input_file} \
@@ -92,6 +80,13 @@ apptainer exec --writable-tmpfs --nv ${AF3_container_path}/alphafold3.1.sif pyth
     --uniref90_database_path=/root/public_databases/uniref90_2022_05.fa \
     --jackhmmer_n_cpu=$SLURM_CPUS_PER_TASK \
     --jax_compilation_cache_dir=/root/jax_cache_dir
+
+if [[ -n "${DATAPIPELINE_STATISTICS_FILE:-}" && -f "$DATAPIPELINE_STATISTICS_FILE" ]]; then
+    end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+    # write statistics
+    echo "${DATA_PIPELINE_ID},${NAME},${SLURM_ARRAY_JOB_ID},${SLURM_ARRAY_TASK_ID},$(hostname),${start_time},${end_time}" >> $DATAPIPELINE_STATISTICS_FILE
+fi
 
 rm -rf $AF3_cache_path
 rm -rf $APPTAINER_TMPDIR
