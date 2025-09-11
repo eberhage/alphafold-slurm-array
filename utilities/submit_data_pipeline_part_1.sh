@@ -1,4 +1,40 @@
 #!/bin/bash
+
+# Parse cluster settings
+export AF3_CONTAINER_PATH=$(jq -r '.af3_container_path' "$CLUSTER_CONFIG")
+export AF3_MODEL_PATH=$(jq -r '.af3_model_path' "$CLUSTER_CONFIG")
+export AF3_DB_PATH=$(jq -r '.af3_db_path' "$CLUSTER_CONFIG")
+
+# Validate paths
+if [ ! -f "$AF3_CONTAINER_PATH" ]; then
+    echo "Error: AF3_CONTAINER_PATH does not point to a file: $AF3_CONTAINER_PATH" >&2
+    exit 1
+fi
+
+if [ ! -d "$AF3_MODEL_PATH" ]; then
+    echo "Error: AF3_MODEL_PATH does not point to a directory: $AF3_MODEL_PATH" >&2
+    exit 1
+fi
+
+if [ ! -d "$AF3_DB_PATH" ]; then
+    echo "Error: AF3_DB_PATH does not point to a directory: $AF3_DB_PATH" >&2
+    exit 1
+fi
+
+export DATAPIPELINE_PARTITION=$(jq -r '.datapipeline_partition' "$CLUSTER_CONFIG")
+export INFERENCE_PARTITION=$(jq -r '.inference_partition' "$CLUSTER_CONFIG")
+
+check_partition() {
+    local partition=$1
+    if ! sinfo -h -o "%R" | awk -v p="$partition" '$1 == p {found=1} END {exit !found}'; then
+        echo "Error: SLURM partition '$partition' is not available on this cluster" >&2
+        exit 1
+    fi
+}
+
+check_partition "$DATAPIPELINE_PARTITION"
+check_partition "$INFERENCE_PARTITION"
+
 # MODE must be cartesian or collapsed
 if [[ "$MODE" != "cartesian" && "$MODE" != "collapsed" ]]; then
     echo "ERROR: MODE must be 'cartesian' or 'collapsed'." >&2
@@ -31,45 +67,55 @@ if ! [[ "$RESULTS_PER_DIR" =~ ^[0-9]+$ ]] || (( RESULTS_PER_DIR <= 0 )); then
     exit 1
 fi
 
-# DATAPIPELINE_PARTITION must be non-empty
-if [[ -z "${DATAPIPELINE_PARTITION:-}" ]]; then
-    echo "ERROR: DATAPIPELINE_PARTITION is not set." >&2
-    exit 1
+# Default to all profiles if user didn't specify
+if [[ -z "${GPU_PROFILES:-}" ]]; then
+    readarray -t GPU_PROFILES_ARRAY < <(jq -r '.gpu_profiles | keys | .[]' "$CLUSTER_CONFIG")
+else
+    # Convert comma-separated string to array
+    IFS=',' read -ra GPU_PROFILES_ARRAY <<< "$GPU_PROFILES"
 fi
 
-# INFERENCE_PARTITION must be non-empty
-if [[ -z "${INFERENCE_PARTITION:-}" ]]; then
-    echo "ERROR: INFERENCE_PARTITION is not set." >&2
-    exit 1
-fi
+check_gres_in_partition() {
+    local partition=$1
+    local gres=$2
+    local profile=$3
+    # Get list of GRES in the partition
+    local available_gres
+    available_gres=$(sinfo -h -o "%G" -p "$partition" | tr ',' '\n' | sort -u)
 
-# SMALL_JOBS_UPPER_LIMIT must be a positive integer
-if ! [[ "$SMALL_JOBS_UPPER_LIMIT" =~ ^[0-9]+$ ]] || (( SMALL_JOBS_UPPER_LIMIT <= 0 )); then
-    echo "ERROR: SMALL_JOBS_UPPER_LIMIT must be a positive integer." >&2
-    exit 1
-fi
+    if ! echo "$available_gres" | grep -q -w "$gres"; then
+        echo "Error: GRES '$gres' for GPU profile '$profile' is not available in partition '$partition'" >&2
+        exit 1
+    fi
+}
 
-# LARGE_JOBS_UPPER_LIMIT must be a positive integer
-if ! [[ "$LARGE_JOBS_UPPER_LIMIT" =~ ^[0-9]+$ ]] || (( LARGE_JOBS_UPPER_LIMIT <= 0 )); then
-    echo "ERROR: LARGE_JOBS_UPPER_LIMIT must be a positive integer." >&2
-    exit 1
-fi
+declare -A GPU_LIMITS GPU_GRES
+for profile in "${GPU_PROFILES_ARRAY[@]}"; do
+    # Check if profile exists in cluster config
+    if ! jq -e --arg p "$profile" '.gpu_profiles[$p]' "$CLUSTER_CONFIG" > /dev/null; then
+        echo "Error: GPU profile '$profile' not found in cluster config ($CLUSTER_CONFIG)" >&2
+        exit 1
+    fi
 
-if (( SMALL_JOBS_UPPER_LIMIT >= LARGE_JOBS_UPPER_LIMIT )); then
-    echo "WARNING: SMALL_JOBS_UPPER_LIMIT ($SMALL_JOBS_UPPER_LIMIT) is not smaller than LARGE_JOBS_UPPER_LIMIT ($LARGE_JOBS_UPPER_LIMIT)."
-fi
+    # Parse gres and token_limit
+    GPU_GRES[$profile]=$(jq -r --arg p "$profile" '.gpu_profiles[$p].gres' "$CLUSTER_CONFIG")
+    GPU_LIMITS[$profile]=$(jq -r --arg p "$profile" '.gpu_profiles[$p].token_limit' "$CLUSTER_CONFIG")
 
-# SMALL_GPU must be non-empty
-if [[ -z "${SMALL_GPU:-}" ]]; then
-    echo "ERROR: SMALL_GPU is not set." >&2
-    exit 1
-fi
+    # Check if token_limit is a valid positive integer
+    if ! [[ "${GPU_LIMITS[$profile]}" =~ ^[1-9][0-9]*$ ]]; then
+        echo "Error: token_limit for GPU profile '$profile' is missing or invalid: ${GPU_LIMITS[$profile]}" >&2
+        exit 1
+    fi
 
-# LARGE_GPU must be non-empty
-if [[ -z "${LARGE_GPU:-}" ]]; then
-    echo "ERROR: LARGE_GPU is not set." >&2
-    exit 1
-fi
+    # Check if gres exists in the partition
+    check_gres_in_partition "$INFERENCE_PARTITION" "${GPU_GRES[$profile]}" "$profile"
+done
+
+#########################################################################################################################
+#															#
+################################################### Main script logic ###################################################
+#															#
+#########################################################################################################################
 
 if ! output=$(python3 utilities/analyze_job_input_json.py "$INPUT_FILE" "$MODE"); then
     echo "Validation of input file failed. Aborting."
@@ -77,6 +123,7 @@ if ! output=$(python3 utilities/analyze_job_input_json.py "$INPUT_FILE" "$MODE")
 fi
 
 read TOTAL_DATAPIPELINE_JOBS TOTAL_INFERENCE_JOBS <<< "$output"
+export TOTAL_DATAPIPELINE_JOBS TOTAL_INFERENCE_JOBS
 NUM_DIMENSIONS=$(jq 'length' "$INPUT_FILE")
 
 if [[ "$MODE" == "cartesian" ]]; then
@@ -114,8 +161,8 @@ esac
 # Create output directories
 DATAPIPELINE_INPUT_DIR="data_pipeline_inputs"
 mkdir -p "$DATAPIPELINE_INPUT_DIR"
-MAX_ARRAY_SIZE=$(scontrol show config | awk -F= '/MaxArraySize/ {gsub(/ /,"",$2); print $2}')
-OUR_ARRAY_SIZE=$(( (MAX_ARRAY_SIZE / RESULTS_PER_DIR) * RESULTS_PER_DIR ))
+export MAX_ARRAY_SIZE=$(scontrol show config | awk -F= '/MaxArraySize/ {gsub(/ /,"",$2); print $2}')
+export OUR_ARRAY_SIZE=$(( (MAX_ARRAY_SIZE / RESULTS_PER_DIR) * RESULTS_PER_DIR ))
 
 if (( OUR_ARRAY_SIZE == 0 )); then
     echo "ERROR: RESULTS_PER_DIR ($RESULTS_PER_DIR) is too large for MAX_ARRAY_SIZE ($MAX_ARRAY_SIZE)." >&2
@@ -161,8 +208,6 @@ for IDX in "${!NAMES[@]}"; do
 }
 EOF
 done
- 
-export TOTAL_DATAPIPELINE_JOBS MAX_ARRAY_SIZE SEEDS INPUT_FILE SORTING TOTAL_INFERENCE_JOBS OUR_ARRAY_SIZE RESULTS_PER_DIR DATAPIPELINE_STATISTICS_FILE INFERENCE_STATISTICS_FILE MODE DATAPIPELINE_PARTITION INFERENCE_PARTITION SMALL_JOBS_UPPER_LIMIT LARGE_JOBS_UPPER_LIMIT SMALL_GPU LARGE_GPU POSTPROCESSING_SCRIPT
 
 if [[ -n "${DATAPIPELINE_STATISTICS_FILE:-}" ]]; then
     # Rotate existing statistics file if it exists

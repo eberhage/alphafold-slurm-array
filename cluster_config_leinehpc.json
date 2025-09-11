@@ -1,0 +1,17 @@
+{
+  "af3_container_path": "/leinesw/software/user/alphafold3/container/alphafold3.1.sif",
+  "af3_model_path": "/leinesw/software/user/alphafold3/model",
+  "af3_db_path": "/leinesw/software/user/alphafold3/db",
+  "datapipeline_partition": "leinecpu_lowprio",
+  "inference_partition": "leinegpu_lowprio",
+  "gpu_profiles": {
+    "small": {
+      "gres": "a100-40g",
+      "token_limit": 3072
+    },
+    "large": {
+      "gres": "a100-80g",
+      "token_limit": 5120
+    }
+  }
+}

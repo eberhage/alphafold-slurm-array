@@ -15,32 +15,11 @@ export RESULTS_PER_DIR=250
 # Sorting options: 'alpha' = use keys of INPUT_FILE alphabetically for the script logic, 'input' = preserve key order from INPUT_FILE.
 export SORTING="alpha"
 
-# SLURM partition to run datapapline on. 
-export DATAPIPELINE_PARTITION="cpupartition"
+# where to find the cluster specific settings for this pipeline
+export CLUSTER_CONFIG="cluster_config.json"
 
-# SLURM partition to run inference on. Must have GPUs.
-export INFERENCE_PARTITION="gpupartition"
-
-# AlphaFold3 container path
-export AF3_CONTAINER_PATH="/path/to/af3_container.sif"
-
-# Path to directory containing the model weights provided by Google
-export AF3_MODEL_PATH="/path/to/model"
-
-# Path to databases directory
-export AF3_DB_PATH="/path/to/db"
-
-# Amount of tokens to process on small GPU.
-export SMALL_JOBS_UPPER_LIMIT=3072
-
-# Amount of tokens to process on large GPU.
-export LARGE_JOBS_UPPER_LIMIT=5120
-
-# Name of the small GPU gres in SLURM
-export SMALL_GPU="a100-40g"
-
-# Name of the large GPU gres in SLURM
-export LARGE_GPU="a100-80g"
+# Choose which GPU profiles from cluster config to use
+export GPU_PROFILES="small,large"
 
 # Datapipeline (MSA, template search) statistics file
 export DATAPIPELINE_STATISTICS_FILE="datapipeline_statistics.csv"

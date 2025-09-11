@@ -1,0 +1,17 @@
+{
+  "af3_container_path": "/path/to/af3_container.sif",
+  "af3_model_path": "/path/to/model",
+  "af3_db_path": "/path/to/db",
+  "datapipeline_partition": "cpupartition",
+  "inference_partition": "gpupartition",
+  "gpu_profiles": {
+    "small": {
+      "gres": "a100-40g",
+      "token_limit": 3072
+    },
+    "large": {
+      "gres": "a100-80g",
+      "token_limit": 5120
+    }
+  }
+}

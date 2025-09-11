@@ -6,9 +6,7 @@ import copy
 
 RESULTS_DIR = "monomer_data"
 INFERENCE_JOBS_DIR = "pending_jobs"
-SMALL_DIR = os.path.join(INFERENCE_JOBS_DIR, "small")
-LARGE_DIR = os.path.join(INFERENCE_JOBS_DIR, "large")
-TOO_BIG_FILE = os.path.join(INFERENCE_JOBS_DIR, "too_big.json")
+TOO_BIG_FILE = "too_big.json"
 
 def dumps_compact_lists(obj, indent=2):
     def _dump(o, level=0):
@@ -46,8 +44,37 @@ def main():
     SEEDS = os.environ["SEEDS"]
     MODE = os.environ["MODE"]
     SORTING = os.environ.get("SORTING", "input")
-    SMALL_JOBS_UPPER_LIMIT = int(os.environ["SMALL_JOBS_UPPER_LIMIT"])
-    LARGE_JOBS_UPPER_LIMIT = int(os.environ["LARGE_JOBS_UPPER_LIMIT"])
+
+    # Load cluster config
+    CLUSTER_CONFIG = os.environ["CLUSTER_CONFIG"]
+    with open(CLUSTER_CONFIG, "r") as f:
+        cluster_conf = json.load(f)
+
+    GPU_PROFILES = os.environ.get("GPU_PROFILES", "")
+    if GPU_PROFILES:
+        GPU_PROFILES = [p.strip() for p in GPU_PROFILES.split(",")]
+    else:
+        GPU_PROFILES = list(cluster_conf.get("gpu_profiles", {}).keys())
+
+    # Sort GPU profiles by token limit ascending
+    sorted_profiles = sorted(
+        GPU_PROFILES,
+        key=lambda p: cluster_conf["gpu_profiles"][p]["token_limit"]
+    )
+
+    profile_limits = {}
+    profile_dirs = {}
+    for profile in sorted_profiles:
+        profile_limits[profile] = cluster_conf["gpu_profiles"][profile]["token_limit"]
+        dir_path = os.path.join(INFERENCE_JOBS_DIR, profile)
+        os.makedirs(dir_path, exist_ok=True)
+        profile_dirs[profile] = dir_path
+
+    GPU_PROFILES = sorted_profiles  # now ensures profiles are always in ascending order
+
+    # Track job indices per profile
+    profile_indices = {profile: 0 for profile in GPU_PROFILES}
+    too_big_jobs = []
 
     try:
         MODEL_SEEDS = [int(s) for s in SEEDS.split(",") if s.strip() != ""]
@@ -95,14 +122,7 @@ def main():
         seq_obj = md["sequences"][0].copy()
         protein_to_monomer_seqobj[name] = seq_obj
 
-    # Prepare output directories
-    os.makedirs(SMALL_DIR, exist_ok=True)
-    os.makedirs(LARGE_DIR, exist_ok=True)
-
     seen = set()
-    small_index = 0
-    large_index = 0
-    too_big_jobs = []
 
     if MODE == "cartesian":
         iterator = itertools.product(*key_lists)
@@ -142,19 +162,19 @@ def main():
 
         token_size = sum(len(seq_obj["protein"]["sequence"]) for seq_obj in sequences)
 
-        if token_size <= SMALL_JOBS_UPPER_LIMIT:
-            target_dir = SMALL_DIR
-            job_file = os.path.join(target_dir, f"{small_index}_{job_name}.json")
-            small_index += 1
-            dump_compact_lists(job_data, job_file)
-            print(f"Created {job_file} (token size {token_size})", file=sys.stderr)
-        elif token_size <= LARGE_JOBS_UPPER_LIMIT:
-            target_dir = LARGE_DIR
-            job_file = os.path.join(target_dir, f"{large_index}_{job_name}.json")
-            large_index += 1
-            dump_compact_lists(job_data, job_file)
-            print(f"Created {job_file} (token size {token_size})", file=sys.stderr)
-        else:
+        assigned = False
+        for profile in GPU_PROFILES:
+            if token_size <= profile_limits[profile]:
+                target_dir = profile_dirs[profile]
+                idx = profile_indices[profile]
+                job_file = os.path.join(target_dir, f"{idx}_{job_name}.json")
+                profile_indices[profile] += 1
+                dump_compact_lists(job_data, job_file)
+                print(f"Created {job_file} (token size {token_size})", file=sys.stderr)
+                assigned = True
+                break
+
+        if not assigned:
             too_big_jobs.append({"name": job_name, "token_size": token_size})
 
     # Write too-big jobs list
@@ -164,7 +184,20 @@ def main():
         print(f"{len(too_big_jobs)} jobs too big -> written to {TOO_BIG_FILE}", file=sys.stderr)
 
     # Final summary
-    print(f"{small_index} {large_index} {len(too_big_jobs)}")
+    output = {
+        "total_jobs": sum(profile_indices.values()) + len(too_big_jobs),
+        "profiles": {},
+        "too_big_jobs": too_big_jobs
+    }
+
+    for profile in GPU_PROFILES:
+        output["profiles"][profile] = {
+            "jobs": profile_indices[profile],
+            "min": 0 if profile == GPU_PROFILES[0] else profile_limits[GPU_PROFILES[GPU_PROFILES.index(profile)-1]] + 1,
+            "max": profile_limits[profile]
+        }
+
+    print(json.dumps(output))
 
 if __name__ == "__main__":
     main()

@@ -23,7 +23,7 @@ if [ $bucket_end -gt $LAST_INFERENCE_ID ]; then
 fi
 
 WORKDIR=$(pwd)
-user_input_file=$WORKDIR/pending_jobs/${JOB_SIZE}/${INFERENCE_ID}_*.json
+user_input_file=$WORKDIR/pending_jobs/${GPU_PROFILE}/${INFERENCE_ID}_*.json
 AF3_input_file=$(basename $user_input_file)
 AF3_input_path=$WORKDIR/tmp/input_${SLURM_ARRAY_JOB_ID}/${SLURM_ARRAY_TASK_ID}
 AF3_output_path=$WORKDIR/results/${SLURM_ARRAY_JOB_ID}_${bucket_start}-${bucket_end}
@@ -87,7 +87,7 @@ if [[ -n "${INFERENCE_STATISTICS_FILE:-}" && -f "$INFERENCE_STATISTICS_FILE" ]];
     )
 
     # write statistics
-    echo "${JOB_SIZE},${INFERENCE_ID},${INFERENCE_NAME},${SLURM_ARRAY_JOB_ID},${SLURM_ARRAY_TASK_ID},$(hostname),${tokens},${bucket_size},${iptm},${ptm},${ranking_score},${start_time},${end_time}" >> $INFERENCE_STATISTICS_FILE
+    echo "${GPU_PROFILE},${INFERENCE_ID},${INFERENCE_NAME},${SLURM_ARRAY_JOB_ID},${SLURM_ARRAY_TASK_ID},$(hostname),${tokens},${bucket_size},${iptm},${ptm},${ranking_score},${start_time},${end_time}" >> $INFERENCE_STATISTICS_FILE
 fi
 
 rm -rf $AF3_cache_path
