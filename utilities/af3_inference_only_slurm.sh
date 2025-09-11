@@ -71,7 +71,7 @@ af_output=$(apptainer exec --writable-tmpfs --nv ${AF3_CONTAINER_PATH} python /a
     --json_path=/root/af_input/${AF3_input_file} \
     --model_dir=/root/models \
     --output_dir=/root/af_output \
-    --jax_compilation_cache_dir=/root/jax_cache_dir
+    --jax_compilation_cache_dir=/root/jax_cache_dir \
 2>&1 | tee -a "slurm-output/slurm-${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}-${SLURM_JOB_NAME}.out")
 
 if [[ -n "${INFERENCE_STATISTICS_FILE:-}" && -f "$INFERENCE_STATISTICS_FILE" ]]; then
