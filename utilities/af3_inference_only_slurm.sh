@@ -3,7 +3,6 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --time=06:00:00
 #SBATCH --ntasks=1
-#SBATCH --partition=leinegpu_lowprio
 #SBATCH --threads-per-core=1                    # Disable Multithreading
 #SBATCH --hint=nomultithread
 #SBATCH --output=slurm-output/slurm-%A_%a-%x.out # %j (Job ID) %x (Job Name)
@@ -51,19 +50,13 @@ if [[ "$SLURM_ARRAY_TASK_ID" -eq 0 ]]; then
 fi
 # --- End of Task-0 block ---
 
-######### Do not change this(!) #########
-AF3_root=/leinesw/software/user/alphafold3
-AF3_model_path=${AF3_root}/model
-AF3_db_path=${AF3_root}/db
-AF3_container_path=${AF3_root}/container
-
 mkdir -p "$AF3_input_path" && mv $user_input_file "$AF3_input_path"
 mkdir -p "$AF3_cache_path"
 mkdir -p "$APPTAINER_TMPDIR"
 mkdir -p "$AF3_output_path"
 python3 utilities/copy_dependency_files.py "$AF3_input_path"/"$AF3_input_file" "$AF3_input_path"
 
-export APPTAINER_BINDPATH="/${AF3_input_path}:/root/af_input,${AF3_output_path}:/root/af_output,${AF3_model_path}:/root/models,${AF3_db_path}:/root/public_databases,${AF3_cache_path}:/root/jax_cache_dir"
+export APPTAINER_BINDPATH="/${AF3_input_path}:/root/af_input,${AF3_output_path}:/root/af_output,${AF3_MODEL_PATH}:/root/models,${AF3_DB_PATH}:/root/public_databases,${AF3_cache_path}:/root/jax_cache_dir"
 
 # Extract the protein name from the JSON
 export INFERENCE_NAME=$(jq -r '.name' "$AF3_input_path"/"$AF3_input_file")
@@ -73,22 +66,12 @@ echo "Running AlphaFold job for ${INFERENCE_NAME} (index ${SLURM_ARRAY_TASK_ID},
 
 start_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-af_output=$(apptainer exec --writable-tmpfs --nv ${AF3_container_path}/alphafold3.1.sif python /app/alphafold/run_alphafold.py \
+af_output=$(apptainer exec --writable-tmpfs --nv ${AF3_CONTAINER_PATH} python /app/alphafold/run_alphafold.py \
     --run_data_pipeline=false \
     --json_path=/root/af_input/${AF3_input_file} \
     --model_dir=/root/models \
     --output_dir=/root/af_output \
-    --mgnify_database_path=/root/public_databases/mgy_clusters_2022_05.fa \
-    --ntrna_database_path=/root/public_databases/nt_rna_2023_02_23_clust_seq_id_90_cov_80_rep_seq.fasta \
-    --pdb_database_path=/root/public_databases/mmcif_files \
-    --rfam_database_path=/root/public_databases/rfam_14_9_clust_seq_id_90_cov_80_rep_seq.fasta \
-    --rna_central_database_path=/root/public_databases/rnacentral_active_seq_id_90_cov_80_linclust.fasta \
-    --seqres_database_path=/root/public_databases/pdb_seqres_2022_09_28.fasta \
-    --small_bfd_database_path=/root/public_databases/bfd-first_non_consensus_sequences.fasta \
-    --uniprot_cluster_annot_database_path=/root/public_databases/uniprot_all_2021_04.fa \
-    --uniref90_database_path=/root/public_databases/uniref90_2022_05.fa \
-    --jackhmmer_n_cpu=$SLURM_CPUS_PER_TASK \
-    --jax_compilation_cache_dir=/root/jax_cache_dir \
+    --jax_compilation_cache_dir=/root/jax_cache_dir
 2>&1 | tee -a "slurm-output/slurm-${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}-${SLURM_JOB_NAME}.out")
 
 if [[ -n "${INFERENCE_STATISTICS_FILE:-}" && -f "$INFERENCE_STATISTICS_FILE" ]]; then

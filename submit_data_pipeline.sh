@@ -21,6 +21,15 @@ export DATAPIPELINE_PARTITION="cpupartition"
 # SLURM partition to run inference on. Must have GPUs.
 export INFERENCE_PARTITION="gpupartition"
 
+# AlphaFold3 container path
+export AF3_CONTAINER_PATH="/path/to/af3_container.sif"
+
+# Path to directory containing the model weights provided by Google
+export AF3_MODEL_PATH="/path/to/model"
+
+# Path to databases directory
+export AF3_DB_PATH="/path/to/db"
+
 # Amount of tokens to process on small GPU.
 export SMALL_JOBS_UPPER_LIMIT=3072 			           
 
@@ -39,7 +48,7 @@ export DATAPIPELINE_STATISTICS_FILE="datapipeline_statistics.csv"
 # Inference (protein structure prediction) statistics file
 export INFERENCE_STATISTICS_FILE="inference_statistics.csv"  
 
-# Optional postprocessing script that runs after every inference job and has access to envirnonment variables such as
+# Optional postprocessing script that runs after every inference job and has access to environment variables such as
 # INFERENCE_NAME, INFERENCE_DIR and INFERENCE_ID. Leave empty if no postprocessing should be done.
 export POSTPROCESSING_SCRIPT="postprocessing_example.sh"           
 

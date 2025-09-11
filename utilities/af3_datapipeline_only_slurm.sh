@@ -48,38 +48,22 @@ if [[ -f "$AF3_output_path"/"$NAME"/"$NAME"_data.json ]]; then
     exit 0
 fi
 
-######### Do not change this(!) #########
-AF3_root=/leinesw/software/user/alphafold3
-AF3_model_path=${AF3_root}/model
-AF3_db_path=${AF3_root}/db
-AF3_container_path=${AF3_root}/container
-
-mkdir -p "$AF3_cache_path"
 mkdir -p "$APPTAINER_TMPDIR"
 mkdir -p "$AF3_output_path"
 
-export APPTAINER_BINDPATH="/${AF3_input_path}:/root/af_input,${AF3_output_path}:/root/af_output,${AF3_model_path}:/root/models,${AF3_db_path}:/root/public_databases,${AF3_cache_path}:/root/jax_cache_dir"
+export APPTAINER_BINDPATH="/${AF3_input_path}:/root/af_input,${AF3_output_path}:/root/af_output,${AF3_MODEL_PATH}:/root/models,${AF3_DB_PATH}:/root/public_databases"
 
 echo "Running AlphaFold job for ${NAME} (index ${SLURM_ARRAY_TASK_ID}, total index ${DATA_PIPELINE_ID})"
 
 start_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-apptainer exec --writable-tmpfs --nv ${AF3_container_path}/alphafold3.1.sif python /app/alphafold/run_alphafold.py \
+apptainer exec --writable-tmpfs --nv ${AF3_CONTAINER_PATH} python /app/alphafold/run_alphafold.py \
     --run_inference=false \
     --json_path=/root/af_input/${AF3_input_file} \
     --model_dir=/root/models \
     --output_dir=/root/af_output \
-    --mgnify_database_path=/root/public_databases/mgy_clusters_2022_05.fa \
-    --ntrna_database_path=/root/public_databases/nt_rna_2023_02_23_clust_seq_id_90_cov_80_rep_seq.fasta \
-    --pdb_database_path=/root/public_databases/mmcif_files \
-    --rfam_database_path=/root/public_databases/rfam_14_9_clust_seq_id_90_cov_80_rep_seq.fasta \
-    --rna_central_database_path=/root/public_databases/rnacentral_active_seq_id_90_cov_80_linclust.fasta \
-    --seqres_database_path=/root/public_databases/pdb_seqres_2022_09_28.fasta \
-    --small_bfd_database_path=/root/public_databases/bfd-first_non_consensus_sequences.fasta \
-    --uniprot_cluster_annot_database_path=/root/public_databases/uniprot_all_2021_04.fa \
-    --uniref90_database_path=/root/public_databases/uniref90_2022_05.fa \
-    --jackhmmer_n_cpu=$SLURM_CPUS_PER_TASK \
-    --jax_compilation_cache_dir=/root/jax_cache_dir
+    --db_dir=/root/public_databases \
+    --jackhmmer_n_cpu=$SLURM_CPUS_PER_TASK 
 
 if [[ -n "${DATAPIPELINE_STATISTICS_FILE:-}" && -f "$DATAPIPELINE_STATISTICS_FILE" ]]; then
     end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -89,7 +73,6 @@ if [[ -n "${DATAPIPELINE_STATISTICS_FILE:-}" && -f "$DATAPIPELINE_STATISTICS_FIL
     echo "${DATA_PIPELINE_ID},${NAME},${SLURM_ARRAY_JOB_ID},${SLURM_ARRAY_TASK_ID},$(hostname),${sequence_length},${start_time},${end_time}" >> $DATAPIPELINE_STATISTICS_FILE
 fi
 
-rm -rf $AF3_cache_path
 rm -rf $APPTAINER_TMPDIR
 rm -rf "$AF3_input_path"/"$AF3_input_file"
 
