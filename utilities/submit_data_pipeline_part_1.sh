@@ -70,7 +70,7 @@ fi
 # Default to all profiles if user didn't specify
 if [[ -z "${GPU_PROFILES:-}" ]]; then
     readarray -t GPU_PROFILES_ARRAY < <(jq -r '.gpu_profiles | keys | .[]' "$CLUSTER_CONFIG")
-    GPU_PROFILES=$(IFS=','; echo "${GPU_PROFILES_ARRAY[*]}")
+    export GPU_PROFILES=$(IFS=','; echo "${GPU_PROFILES_ARRAY[*]}")
 fi
 
 check_gres_in_partition() {
