@@ -1,6 +1,6 @@
 # AlphaFold SLURM Array
 
-This repository provides a wrapper around **AlphaFold** to run large numbers of inference jobs in a systematic and reproducible way on HPCs with SLURM.
+This repository provides a wrapper around **AlphaFold** to run large numbers of inference jobs in a systematic and reproducible way on HPCs with SLURM and Apptainer (formerly Singularity).
 It supports two exploration strategies for protein sequence combinations. Each **dimension** represents a set of proteins.
 - `cartesian`: exhaustive Cartesian product exploration across dimensions  
 	→ Proteins will **never** be part of the same job with proteins from the *same* dimension but instead be in exactly one job with all protein combinations from *other* dimensions.
@@ -54,14 +54,25 @@ The behavior of the pipeline is controlled by the `MODE` parameter.
 ### Configuration
 The following parameters are set inside submit_data_pipeline.sh:
 
-| Variable          | Description                                                                                                                                                   |
-|-------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `INPUT_FILE`      | Path to the input JSON file (default: `input.json`).                                                                                                          |
-| `MODE`            | Job generation mode:<ul><li>`cartesian`: full product between dimensions</li><li>`collapsed`: one job per dimension</li></ul>                                 |
-| `SEEDS`           | Comma-separated AlphaFold seeds used for inference (default: `"0,1,2"`).                                                                                      |
-| `RESULTS_PER_DIR` | Number of results to bundle per directory (default: `250`). Naming scheme: `results/<SLURM_ARRAY_JOB_ID>_x-y`.                                                |
-| `SORTING`         | How to order protein chains within a dimension:<br><ul><li>`alpha`: alphabetically by protein key</li><li>`input`: preserve order from `input.json`</li></ul> |
-| `STATISTICS_FILE` | CSV file where inference statistics will be stored (default: `statistics.csv`).                                                                               |
+| Variable                       | Description                                                                                                                                                                       |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `INPUT_FILE`                   | Path to the input JSON file (default: `input.json`).                                                                                                                              |
+| `MODE`                         | Job generation mode:<ul><li>`cartesian`: full product between dimensions</li><li>`collapsed`: one job per dimension</li></ul>                                                     |
+| `SEEDS`                        | Comma-separated AlphaFold seeds used for inference.                                                                                                                               |
+| `RESULTS_PER_DIR`              | Number of results to bundle per directory. Naming scheme: `results/<SLURM_ARRAY_JOB_ID>_x-y`.                                                                                     |
+| `SORTING`                      | How to order protein chains within a dimension:<br><ul><li>`alpha`: alphabetically by protein key</li><li>`input`: preserve order from `input.json`</li></ul>                     |
+| `DATAPIPELINE_PARTITION`       | SLURM partition to run the **data pipeline** (MSA, template search).                                                                                                              |
+| `INFERENCE_PARTITION`          | SLURM partition to run the **inference** step. Must provide access to GPUs.                                                                                                       |
+| `AF3_CONTAINER_PATH`           | Path to the AlphaFold3 Apptainer container.                                                                                                                                       |
+| `AF3_MODEL_PATH`               | Path to the directory containing the AlphaFold3 model weights (provided by Google).                                                                                               |
+| `AF3_DB_PATH`                  | Path to the directory containing the AlphaFold3 databases.                                                                                                                        |
+| `SMALL_JOBS_UPPER_LIMIT`       | Token cutoff for small GPU jobs (jobs with ≤ this many tokens will run on `SMALL_GPU`).                                                                                           |
+| `LARGE_JOBS_UPPER_LIMIT`       | Token cutoff for large GPU jobs (jobs with ≤ this many tokens will run on `LARGE_GPU`).                                                                                           |
+| `SMALL_GPU`                    | Name of the SLURM GPU resource (gres) corresponding to the smaller GPU (e.g., `"a100-40g"`).                                                                                      |
+| `LARGE_GPU`                    | Name of the SLURM GPU resource (gres) corresponding to the larger GPU (e.g., `"a100-80g"`).                                                                                       |
+| `DATAPIPELINE_STATISTICS_FILE` | CSV file where statistics from the **data pipeline** stage will be stored (default: `datapipeline_statistics.csv`).                                                               |
+| `INFERENCE_STATISTICS_FILE`    | CSV file where statistics from the **inference** stage will be stored (default: `inference_statistics.csv`).                                                                      |
+| `POSTPROCESSING_SCRIPT`        | Optional script that runs after each inference job. It has access to environment variables such as `INFERENCE_NAME`, `INFERENCE_DIR`, and `INFERENCE_ID`. Leave empty to disable. |
 
 
 ### Output
@@ -104,7 +115,6 @@ These values are automatically collected into the statistics CSV file for downst
 ### Example Workflow
 
 - Prepare input (`input.json`) with your protein sequences.
-- Adjust configuration inside `submit_data_pipeline.sh` if needed.
-- Check SBATCH-headers and contents of the `af3_<...>.sh` files in `utilities` for your cluster specific settings.
+- Adjust configuration inside `submit_data_pipeline.sh`.
 - Submit the pipeline to your HPC cluster (SLURM).
-- Collect statistics from the generated `statistics.csv`.
+- Collect statistics from the generated CSV files.
