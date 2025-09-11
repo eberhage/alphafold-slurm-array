@@ -33,6 +33,23 @@ Each dictionary defines one **dimension vector**, where every entry is a `"Prote
 ]
 ```
 
+## Job Configuration
+The following parameters are set inside submit_data_pipeline.sh:
+
+| Variable                       | Description                                                                                                                                                                       |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `INPUT_FILE`                   | Path to the input JSON file (default: `input.json`).                                                                                                                              |
+| `MODE`                         | Job generation mode (see [below](#mode)):<ul><li>`cartesian`: full product between dimensions</li><li>`collapsed`: one job per dimension</li></ul>                                |
+| `SEEDS`                        | Comma-separated AlphaFold seeds used for inference.                                                                                                                               |
+| `RESULTS_PER_DIR`              | Number of results to bundle per directory. Naming scheme: `results/<SLURM_ARRAY_JOB_ID>_x-y`.                                                                                     |
+| `SORTING`                      | How to order protein chains within a dimension:<br><ul><li>`alpha`: alphabetically by protein key</li><li>`input`: preserve order from `input.json`</li></ul>                     |
+| `CLUSTER_CONFIG`               | Path to your cluster configuration JSON file (see [below](#cluster-configuration)).                                                                                               |
+| `GPU_PROFILES`                 | Comma-separated list of GPU profiles from cluster configuration to use for job assignment (e.g., `"small,large"`).                                                                |
+| `DATAPIPELINE_STATISTICS_FILE` | CSV file where statistics from the **data pipeline** stage will be stored (default: `datapipeline_statistics.csv`).                                                               |
+| `INFERENCE_STATISTICS_FILE`    | CSV file where statistics from the **inference** stage will be stored (default: `inference_statistics.csv`).                                                                      |
+| `POSTPROCESSING_SCRIPT`        | Optional script that runs after each inference job. It has access to environment variables such as `INFERENCE_NAME`, `INFERENCE_DIR`, and `INFERENCE_ID`. Leave empty to disable. |
+
+
 ### Mode
 The behavior of the pipeline is controlled by the `MODE` parameter.
 - `cartesian`  
@@ -51,30 +68,13 @@ The behavior of the pipeline is controlled by the `MODE` parameter.
 
 	ABC, D, EF
 
-### Configuration
-The following parameters are set inside submit_data_pipeline.sh:
-
-| Variable                       | Description                                                                                                                                                                       |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `INPUT_FILE`                   | Path to the input JSON file (default: `input.json`).                                                                                                                              |
-| `MODE`                         | Job generation mode:<ul><li>`cartesian`: full product between dimensions</li><li>`collapsed`: one job per dimension</li></ul>                                                     |
-| `SEEDS`                        | Comma-separated AlphaFold seeds used for inference.                                                                                                                               |
-| `RESULTS_PER_DIR`              | Number of results to bundle per directory. Naming scheme: `results/<SLURM_ARRAY_JOB_ID>_x-y`.                                                                                     |
-| `SORTING`                      | How to order protein chains within a dimension:<br><ul><li>`alpha`: alphabetically by protein key</li><li>`input`: preserve order from `input.json`</li></ul>                     |
-| `CLUSTER_CONFIG`               | Path to your cluster configuration JSON file (see below).                                                                                                                         |
-| `GPU_PROFILES`                 | Comma-separated list of GPU profiles from cluster configuration to use for job assignment (e.g., `"small,large"`).                                                                |
-| `DATAPIPELINE_STATISTICS_FILE` | CSV file where statistics from the **data pipeline** stage will be stored (default: `datapipeline_statistics.csv`).                                                               |
-| `INFERENCE_STATISTICS_FILE`    | CSV file where statistics from the **inference** stage will be stored (default: `inference_statistics.csv`).                                                                      |
-| `POSTPROCESSING_SCRIPT`        | Optional script that runs after each inference job. It has access to environment variables such as `INFERENCE_NAME`, `INFERENCE_DIR`, and `INFERENCE_ID`. Leave empty to disable. |
-
-
-## Cluster Configuration (`cluster_config.json`)
+## Cluster Configuration
 
 The pipeline now uses a **cluster configuration JSON** to define paths, SLURM partitions, and GPU profiles. This centralizes settings that are unlikely to change frequently.  
 
 ### Example
 
-```
+```json
 {
   "af3_container_path": "/path/to/af3_container.sif",
   "af3_model_path": "/path/to/model",
@@ -92,6 +92,7 @@ The pipeline now uses a **cluster configuration JSON** to define paths, SLURM pa
     }
   }
 }
+```
 
 | Field                    | Description                                                                                                                                                                                  |
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -112,7 +113,7 @@ The pipeline now uses a **cluster configuration JSON** to define paths, SLURM pa
 
 The AlphaFold jobs are sorted into a result directory with the following structure:
 
-```
+```bash
 results/
  ├── <SLURM_ARRAY_JOB_ID>_0-249/
  │    ├── <inference_job_name>/
@@ -135,7 +136,6 @@ results/
  │   ...
 ...
 ```
-
 
 The file <job_name>_summary_confidences.json contains model quality metrics such as:
 
