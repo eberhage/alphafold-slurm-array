@@ -61,21 +61,54 @@ The following parameters are set inside submit_data_pipeline.sh:
 | `SEEDS`                        | Comma-separated AlphaFold seeds used for inference.                                                                                                                               |
 | `RESULTS_PER_DIR`              | Number of results to bundle per directory. Naming scheme: `results/<SLURM_ARRAY_JOB_ID>_x-y`.                                                                                     |
 | `SORTING`                      | How to order protein chains within a dimension:<br><ul><li>`alpha`: alphabetically by protein key</li><li>`input`: preserve order from `input.json`</li></ul>                     |
-| `DATAPIPELINE_PARTITION`       | SLURM partition to run the **data pipeline** (MSA, template search).                                                                                                              |
-| `INFERENCE_PARTITION`          | SLURM partition to run the **inference** step. Must provide access to GPUs.                                                                                                       |
-| `AF3_CONTAINER_PATH`           | Path to the AlphaFold3 Apptainer container.                                                                                                                                       |
-| `AF3_MODEL_PATH`               | Path to the directory containing the AlphaFold3 model weights (provided by Google).                                                                                               |
-| `AF3_DB_PATH`                  | Path to the directory containing the AlphaFold3 databases.                                                                                                                        |
-| `SMALL_JOBS_UPPER_LIMIT`       | Token cutoff for small GPU jobs (jobs with ≤ this many tokens will run on `SMALL_GPU`).                                                                                           |
-| `LARGE_JOBS_UPPER_LIMIT`       | Token cutoff for large GPU jobs (jobs with ≤ this many tokens will run on `LARGE_GPU`).                                                                                           |
-| `SMALL_GPU`                    | Name of the SLURM GPU resource (gres) corresponding to the smaller GPU (e.g., `"a100-40g"`).                                                                                      |
-| `LARGE_GPU`                    | Name of the SLURM GPU resource (gres) corresponding to the larger GPU (e.g., `"a100-80g"`).                                                                                       |
+| `CLUSTER_CONFIG`               | Path to your cluster configuration JSON file (see below).                                                                                                                         |
+| `GPU_PROFILES`                 | Comma-separated list of GPU profiles from cluster configuration to use for job assignment (e.g., `"small,large"`).                                                                |
 | `DATAPIPELINE_STATISTICS_FILE` | CSV file where statistics from the **data pipeline** stage will be stored (default: `datapipeline_statistics.csv`).                                                               |
 | `INFERENCE_STATISTICS_FILE`    | CSV file where statistics from the **inference** stage will be stored (default: `inference_statistics.csv`).                                                                      |
 | `POSTPROCESSING_SCRIPT`        | Optional script that runs after each inference job. It has access to environment variables such as `INFERENCE_NAME`, `INFERENCE_DIR`, and `INFERENCE_ID`. Leave empty to disable. |
 
 
-### Output
+## Cluster Configuration (`cluster_config.json`)
+
+The pipeline now uses a **cluster configuration JSON** to define paths, SLURM partitions, and GPU profiles. This centralizes settings that are unlikely to change frequently.  
+
+### Example
+
+```
+{
+  "af3_container_path": "/path/to/af3_container.sif",
+  "af3_model_path": "/path/to/model",
+  "af3_db_path": "/path/to/db",
+  "datapipeline_partition": "cpupartition",
+  "inference_partition": "gpupartition",
+  "gpu_profiles": {
+    "small": {
+      "gres": "a100-40g",
+      "token_limit": 3072
+    },
+    "large": {
+      "gres": "a100-80g",
+      "token_limit": 5120
+    }
+  }
+}
+
+| Field                    | Description                                                                                                                                                                                  |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `af3_container_path`     | Path to the AlphaFold3 container file (`.sif`).                                                                                                                                              |
+| `af3_model_path`         | Path to the directory containing [AlphaFold3 model weights provided by Google-Deepmind](https://docs.google.com/forms/d/e/1FAIpQLSfWZAgo1aYk0O4MuAXZj8xRQ8DafeFJnldNOnh_13qAx2ceZw/viewform).|
+| `af3_db_path`            | Path to the AlphaFold3 databases directory.                                                                                                                                                  |
+| `datapipeline_partition` | SLURM partition used for MSA/template search (CPU jobs).                                                                                                                                     |
+| `inference_partition`    | SLURM partition used for inference (GPU jobs).                                                                                                                                               |
+| `gpu_profiles`           | Dictionary of GPU profiles. Each profile defines: <ul><li>`gres`: GPU resource name in SLURM</li><li>`token_limit`: maximum number of tokens this profile can handle</li></ul>               |
+
+### Notes on GPU Profiles
+
+- Users may define **any number of GPU profiles**. Each profile must include a valid `gres` and a `token_limit`.
+- The pipeline will automatically **assign jobs to the smallest possible GPU profile** that can handle the total tokens of the job.
+- Token limits allow the pipeline to efficiently distribute jobs across different GPU types.
+
+## Output
 
 The AlphaFold jobs are sorted into a result directory with the following structure:
 
@@ -112,9 +145,10 @@ The file <job_name>_summary_confidences.json contains model quality metrics such
 
 These values are automatically collected into the statistics CSV file for downstream analysis.
 
-### Example Workflow
+## Example Workflow
 
 - Prepare input (`input.json`) with your protein sequences.
+- Prepare cluster configuration file.
 - Adjust configuration inside `submit_data_pipeline.sh`.
 - Submit the pipeline to your HPC cluster (SLURM).
 - Collect statistics from the generated CSV files.
