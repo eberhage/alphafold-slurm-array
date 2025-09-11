@@ -70,9 +70,7 @@ fi
 # Default to all profiles if user didn't specify
 if [[ -z "${GPU_PROFILES:-}" ]]; then
     readarray -t GPU_PROFILES_ARRAY < <(jq -r '.gpu_profiles | keys | .[]' "$CLUSTER_CONFIG")
-else
-    # Convert comma-separated string to array
-    IFS=',' read -ra GPU_PROFILES_ARRAY <<< "$GPU_PROFILES"
+    GPU_PROFILES=$(IFS=','; echo "${GPU_PROFILES_ARRAY[*]}")
 fi
 
 check_gres_in_partition() {
@@ -89,6 +87,7 @@ check_gres_in_partition() {
     fi
 }
 
+IFS=',' read -ra GPU_PROFILES_ARRAY <<< "$GPU_PROFILES"
 declare -A GPU_LIMITS GPU_GRES
 for profile in "${GPU_PROFILES_ARRAY[@]}"; do
     # Check if profile exists in cluster config
