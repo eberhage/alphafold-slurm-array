@@ -147,11 +147,13 @@ def main():
             job_file = os.path.join(target_dir, f"{small_index}_{job_name}.json")
             small_index += 1
             dump_compact_lists(job_data, job_file)
+            print(f"Created {job_file} (token size {token_size})", file=sys.stderr)
         elif token_size <= LARGE_JOBS_UPPER_LIMIT:
             target_dir = LARGE_DIR
             job_file = os.path.join(target_dir, f"{large_index}_{job_name}.json")
             large_index += 1
             dump_compact_lists(job_data, job_file)
+            print(f"Created {job_file} (token size {token_size})", file=sys.stderr)
         else:
             too_big_jobs.append({"name": job_name, "token_size": token_size})
 
