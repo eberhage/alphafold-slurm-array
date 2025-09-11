@@ -7,7 +7,7 @@
 echo "Postprocessing..."
 echo "Currently this does nothing except printing some variables to the SLURM-log:"
 echo
-echo "JOB_SIZE = '$JOB_SIZE'"
+echo "GPU_PROFILE = '$GPU_PROFILE'"
 echo "INFERENCE_ID = '$INFERENCE_ID'"
 echo "INFERENCE_NAME = '$INFERENCE_NAME'"
 echo "INFERENCE_DIR = '$INFERENCE_DIR'"

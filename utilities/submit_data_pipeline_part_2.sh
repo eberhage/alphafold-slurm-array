@@ -32,11 +32,11 @@ TOTAL_INFERENCE_JOBS=$(echo "$json_output" | jq -r '.total_jobs')
 TOO_BIG_JOBS=$(echo "$json_output" | jq -r '.too_big_jobs | length')
 
 # Reconstruct array
-IFS=',' read -ra GPU_PROFILES <<< "$GPU_PROFILES"
+IFS=',' read -ra GPU_PROFILES_ARRAY <<< "$GPU_PROFILES"
 
 # Extract jobs per profile into associative arrays
 declare -A JOB_COUNTS BOUND_MIN BOUND_MAX GPU_GRES
-for profile in "${GPU_PROFILES[@]}"; do
+for profile in "${GPU_PROFILES_ARRAY[@]}"; do
     # Check profile exists in JSON
     if ! echo "$json_output" | jq -e ".profiles | has(\"$profile\")" >/dev/null; then
         echo "Error: Profile '$profile' missing in JSON output" >&2
@@ -51,14 +51,14 @@ done
 
 # Logging
 echo "Total jobs (calculated): $TOTAL_INFERENCE_JOBS"
-for profile in "${GPU_PROFILES[@]}"; do
+for profile in "${GPU_PROFILES_ARRAY[@]}"; do
     echo "Jobs for profile '$profile' (Tokens ${BOUND_MIN[$profile]}-${BOUND_MAX[$profile]}): ${JOB_COUNTS[$profile]}"
 done
-echo "Too big jobs (Tokens > ${BOUND_MAX[${GPU_PROFILES[-1]}]}): $TOO_BIG_JOBS"
+echo "Too big jobs (Tokens > ${BOUND_MAX[${GPU_PROFILES_ARRAY[-1]}]}): $TOO_BIG_JOBS"
 
 # Sanity check: sum of profile jobs + too big jobs should equal total jobs
 sum=0
-for profile in "${GPU_PROFILES[@]}"; do
+for profile in "${GPU_PROFILES_ARRAY[@]}"; do
     sum=$((sum + JOB_COUNTS[$profile]))
 done
 sum=$((sum + TOO_BIG_JOBS))
@@ -73,7 +73,7 @@ fi
 # ------------------------------
 
 # Loop over all selected GPU profiles
-for profile in "${GPU_PROFILES[@]}"; do
+for profile in "${GPU_PROFILES_ARRAY[@]}"; do
     job_count=${JOB_COUNTS[$profile]:-0}
     gpu_type=${GPU_GRES[$profile]}
 
