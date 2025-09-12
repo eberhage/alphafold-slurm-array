@@ -3,7 +3,7 @@ import re
 import json
 import itertools
 
-VALID_AA = set("ACDEFGHIKLMNPQRSTVWY")
+VALID_AA = set("ACDEFGHIKLMNPQRSTVWYUOX")
 VALID_FILENAME_REGEX = re.compile(r'^[A-Za-z0-9_-]+$')
 
 # Read arguments

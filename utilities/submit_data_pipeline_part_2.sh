@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=AF3_part_2
-#SBATCH --time=00:10:00
+#SBATCH --time=01:00:00
 #SBATCH --output=slurm-output/slurm-%j-%x.out # %j (Job ID) %x (Job Name)
 
 rm -rf data_pipeline_inputs
