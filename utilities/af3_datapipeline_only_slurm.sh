@@ -17,8 +17,6 @@ user_input_file=$WORKDIR/data_pipeline_inputs/${DATA_PIPELINE_ID}_*.json
 AF3_input_file=$(basename $user_input_file)
 AF3_input_path=$WORKDIR/data_pipeline_inputs
 AF3_output_path=$WORKDIR/monomer_data
-AF3_cache_path=$WORKDIR/tmp/af3_cache_${SLURM_ARRAY_JOB_ID}/${SLURM_ARRAY_TASK_ID} # Cache directory
-json_done_path=$WORKDIR/done
 export APPTAINER_TMPDIR=$WORKDIR/tmp/apptainer_${SLURM_ARRAY_JOB_ID}/${SLURM_ARRAY_TASK_ID}
 
 # --- Task 0 only: decide what’s next ---
