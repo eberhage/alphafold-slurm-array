@@ -2,11 +2,7 @@ import os
 import json
 import sys
 
-# Constants
 OUTPUT_DIR = "data_pipeline_inputs"
-
-# Read environment variables
-sorting = os.environ.get("SORTING", "input")
 input_file = os.environ["INPUT_FILE"]
 
 # Ensure output directory exists
@@ -14,50 +10,48 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Load JSON once
 with open(input_file, "r") as f:
-    data = json.load(f)
+    dimensions = json.load(f)
 
-# Collect first-seen values for each key, check consistency
-first_seen = {}
-for entry_idx, entry in enumerate(data):
-    if isinstance(entry, dict):
-        for k, v in entry.items():
-            if k not in first_seen:
-                first_seen[k] = v
-            else:
-                if first_seen[k] != v:
-                    sys.stderr.write(
-                        f"ERROR: Key '{k}' has inconsistent values.\n"
-                        f"  First seen: {first_seen[k]}\n"
-                        f"  At entry {entry_idx}: {v}\n"
-                    )
-                    sys.exit(1)
+# protein_name → first seen protein_seq
+first_seen_sequences = {}
+file_index = 0
 
-# Determine key order
-if sorting == "input":
-    names = list(first_seen.keys())   # order of appearance
-elif sorting == "alpha":
-    names = sorted(first_seen.keys()) # alphabetical
-else:
-    sys.stderr.write("ERROR: SORTING must be 'alpha' or 'input'\n")
-    sys.exit(1)
+for dim_idx, dimension in enumerate(dimensions):
+    if not isinstance(dimension, dict):
+        continue
 
-# Write out JSON files
-for idx, name in enumerate(names):
-    out_json = {
-        "name": name,
-        "sequences": [
-            {
-                "protein": {
-                    "id": "A",
-                    "sequence": first_seen[name]
-                }
+    for protein_name, protein_seq in dimension.items():
+        if protein_name not in first_seen_sequences:
+            # First time we see this protein → store and write JSON
+            first_seen_sequences[protein_name] = protein_seq
+
+            out_json = {
+                "name": protein_name,
+                "sequences": [
+                    {
+                        "protein": {
+                            "id": "A",
+                            "sequence": protein_seq
+                        }
+                    }
+                ],
+                "dialect": "alphafold3",
+                "version": 3,
+                "modelSeeds": [0]
             }
-        ],
-        "dialect": "alphafold3",
-        "version": 3,
-        "modelSeeds": [0]
-    }
 
-    out_path = os.path.join(OUTPUT_DIR, f"{idx}_{name}.json")
-    with open(out_path, "w") as out_f:
-        json.dump(out_json, out_f, indent=4)
+            out_path = os.path.join(OUTPUT_DIR, f"{file_index}_{protein_name}.json")
+            with open(out_path, "w") as out_f:
+                json.dump(out_json, out_f, indent=4)
+
+            file_index += 1
+
+        else:
+            # Already seen this protein → check consistency
+            if first_seen_sequences[protein_name] != protein_seq:
+                sys.stderr.write(
+                    f"ERROR: Protein '{protein_name}' has inconsistent sequences.\n"
+                    f"  First seen: {first_seen_sequences[protein_name]}\n"
+                    f"  At dimension {dim_idx}: {protein_seq}\n"
+                )
+                sys.exit(1)
