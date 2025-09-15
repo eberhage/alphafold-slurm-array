@@ -1,7 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=AF3_datapipeline
 #SBATCH --cpus-per-task=8
-#SBATCH --time=02:00:00
+#SBATCH --mem=128G
+#SBATCH --time=06:00:00
 #SBATCH --ntasks=1
 #SBATCH --threads-per-core=1                    # Disable Multithreading
 #SBATCH --hint=nomultithread
