@@ -12,9 +12,10 @@ args = parser.parse_args()
 use_gzip = args.gzip
 input_file = args.input_file
 
-# Folders
-msa_folder = "msas"
-template_folder = "templates"
+# Folders relative to input file location
+input_dir = os.path.dirname(os.path.abspath(input_file))
+msa_folder = os.path.join(input_dir, "msas")
+template_folder = os.path.join(input_dir, "templates")
 os.makedirs(msa_folder, exist_ok=True)
 os.makedirs(template_folder, exist_ok=True)
 
@@ -53,7 +54,6 @@ def dumps_compact_lists(obj, indent=2):
 def dump_compact_lists(obj, filename, indent=2):
     with open(filename, "w") as f:
         f.write(dumps_compact_lists(obj, indent))
-
 
 def file_content_matches(path, new_content):
     """Check if file exists and has identical content."""
@@ -114,13 +114,13 @@ for seq_entry in data.get("sequences", []):
     if "unpairedMsa" in protein and protein["unpairedMsa"]:
         unpaired_content = protein.pop("unpairedMsa")
         unpaired_file = os.path.join(msa_folder, f"{name}_unpaired.a3m")
-        protein["unpairedMsaPath"] = write_file(unpaired_file, unpaired_content)
+        protein["unpairedMsaPath"] = os.path.relpath(write_file(unpaired_file, unpaired_content), input_dir)
 
     # Handle paired MSA
     if "pairedMsa" in protein and protein["pairedMsa"]:
         paired_content = protein.pop("pairedMsa")
         paired_file = os.path.join(msa_folder, f"{name}_paired.a3m")
-        protein["pairedMsaPath"] = write_file(paired_file, paired_content)
+        protein["pairedMsaPath"] = os.path.relpath(write_file(paired_file, paired_content), input_dir)
 
     # Handle templates
     for template in protein.get("templates", []):
@@ -137,7 +137,7 @@ for seq_entry in data.get("sequences", []):
             if not os.path.exists(cif_path):
                 write_file(cif_path.replace(".gz", "") if use_gzip else cif_path, cif_content)
 
-            template["mmcifPath"] = cif_path
+            template["mmcifPath"] = os.path.relpath(cif_path, input_dir)
 
 # Save updated JSON in-place
 dump_compact_lists(data, input_file)

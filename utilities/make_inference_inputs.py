@@ -4,9 +4,11 @@ import sys
 import itertools
 import copy
 
-RESULTS_DIR = "monomer_data"
+monomer_dir = "monomer_data"
 INFERENCE_JOBS_DIR = "pending_jobs"
 TOO_BIG_FILE = "too_big.json"
+msas_dir = "msas"
+templates_dir = "templates"
 
 def dumps_compact_lists(obj, indent=2):
     def _dump(o, level=0):
@@ -63,12 +65,8 @@ def main():
     )
 
     profile_limits = {}
-    profile_dirs = {}
     for profile in sorted_profiles:
         profile_limits[profile] = cluster_conf["gpu_profiles"][profile]["token_limit"]
-        dir_path = os.path.join(INFERENCE_JOBS_DIR, profile)
-        os.makedirs(dir_path, exist_ok=True)
-        profile_dirs[profile] = dir_path
 
     GPU_PROFILES = sorted_profiles  # now ensures profiles are always in ascending order
 
@@ -114,7 +112,7 @@ def main():
     all_proteins = set().union(*key_lists) if key_lists else set()
     protein_to_monomer_seqobj = {}
     for name in sorted(all_proteins):
-        path = os.path.join(RESULTS_DIR, name, f"{name}_data.json")
+        path = os.path.join(monomer_dir, f"{name}_data.json")
         if not os.path.exists(path):
             raise FileNotFoundError(f"Missing monomer result: {path}")
         with open(path, "r") as f:
@@ -165,7 +163,14 @@ def main():
         assigned = False
         for profile in GPU_PROFILES:
             if token_size <= profile_limits[profile]:
-                target_dir = profile_dirs[profile]
+                target_dir = os.path.join(INFERENCE_JOBS_DIR, profile)
+                os.makedirs(target_dir, exist_ok=True)
+                msas_link = os.path.join(target_dir, msas_dir)
+                msas_target = os.path.join("..", "..", monomer_dir, msas_dir)
+                os.path.islink(msas_link) or os.symlink(msas_target, msas_link, target_is_directory=True)
+                templates_link = os.path.join(target_dir, templates_dir)
+                templates_target = os.path.join("..", "..", monomer_dir, templates_dir)
+                os.path.islink(templates_link) or os.symlink(templates_target, templates_link, target_is_directory=True)
                 idx = profile_indices[profile]
                 job_file = os.path.join(target_dir, f"{idx}_{job_name}.json")
                 profile_indices[profile] += 1

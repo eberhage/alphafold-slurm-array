@@ -42,8 +42,8 @@ fi
 # Extract the protein name from the JSON
 NAME=$(jq -r '.name' "$AF3_input_path"/"$AF3_input_file")
 
-if [[ -f "$AF3_output_path"/"$NAME"/"$NAME"_data.json ]]; then
-    echo "MSA "$NAME"/"$NAME"_data.json already exists. Skipping."
+if [[ -f "$AF3_output_path"/"$NAME"_data.json ]]; then
+    echo "MSA "$NAME"_data.json already exists. Skipping."
     exit 0
 fi
 
@@ -75,5 +75,8 @@ fi
 rm -rf $APPTAINER_TMPDIR
 rm -rf "$AF3_input_path"/"$AF3_input_file"
 
+# move file one up and delete old directory (it is always only one file per directory -> messy)
+mv "$AF3_output_path"/"$NAME"/"$NAME"_data.json "$AF3_output_path" && rm -rf "$AF3_output_path"/"$NAME"
+
 echo "Extracting MSA and templates"
-python3 $WORKDIR/utilities/extract_msa_and_template_data.py -z "$AF3_output_path"/"$NAME"/"$NAME"_data.json
+python3 $WORKDIR/utilities/extract_msa_and_template_data.py -z "$AF3_output_path"/"$NAME"_data.json

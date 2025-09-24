@@ -27,29 +27,35 @@ def main():
     parser.add_argument("dest_dir", help="Directory to copy files into")
     args = parser.parse_args()
 
-    json_dir = os.path.dirname(os.path.abspath(args.json_file))
+    json_file = os.path.abspath(args.json_file)
+    json_dir = os.path.dirname(json_file)
     os.makedirs(args.dest_dir, exist_ok=True)
 
     # Load JSON
-    with open(args.json_file) as f:
+    with open(json_file) as f:
         data = json.load(f)
 
     # Find all paths
     file_paths = find_paths(data)
     if not file_paths:
         print("No Path keys found in JSON.")
-        return
+    else:
+        for rel_path in file_paths:
+            # Resolve against JSON dir
+            src_path = os.path.join(json_dir, rel_path)
+            if os.path.exists(src_path):
+                # Preserve structure relative to json_dir
+                dest_path = os.path.join(args.dest_dir, rel_path)
+                os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+                shutil.copy2(src_path, dest_path)
+                print(f"Copied {src_path} → {dest_path}")
+            else:
+                print(f"Warning: file not found: {src_path}")
 
-    # Copy files preserving relative paths
-    for path in file_paths:
-        if os.path.exists(path):
-            rel_path = os.path.normpath(path)
-            dest_path = os.path.join(args.dest_dir, rel_path)
-            os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-            shutil.copy2(path, dest_path)
-            print(f"Copied {path} → {dest_path}")
-        else:
-            print(f"Warning: file not found: {path}")
+    # Copy the JSON file itself
+    dest_json = os.path.join(args.dest_dir, os.path.basename(json_file))
+    shutil.copy2(json_file, dest_json)
+    print(f"Copied input JSON → {dest_json}")
 
 if __name__ == "__main__":
     main()

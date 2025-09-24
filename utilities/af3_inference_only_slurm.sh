@@ -50,11 +50,12 @@ if [[ "$SLURM_ARRAY_TASK_ID" -eq 0 ]]; then
 fi
 # --- End of Task-0 block ---
 
-mkdir -p "$AF3_input_path" && mv $user_input_file "$AF3_input_path"
+mkdir -p "$AF3_input_path"
+mkdir -p "$AF3_output_path"
 mkdir -p "$AF3_cache_path"
 mkdir -p "$APPTAINER_TMPDIR"
-mkdir -p "$AF3_output_path"
-python3 utilities/copy_dependency_files.py "$AF3_input_path"/"$AF3_input_file" "$AF3_input_path"
+python3 utilities/copy_json_and_dependency_files.py $user_input_file "$AF3_input_path"
+rm $user_input_file
 
 export APPTAINER_BINDPATH="/${AF3_input_path}:/root/af_input,${AF3_output_path}:/root/af_output,${AF3_MODEL_PATH}:/root/models,${AF3_DB_PATH}:/root/public_databases,${AF3_cache_path}:/root/jax_cache_dir"
 
