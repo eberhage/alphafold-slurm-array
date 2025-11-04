@@ -68,6 +68,9 @@ The behavior of the pipeline is controlled by the `MODE` parameter.
 
 	ABC, D, EF
 
+> [!WARNING]  
+> In `collapsed` mode, sequence names must be unique per dimension (they may repeat across dimensions). If multiple chains share the same name and you *have* to use `collapsed` mode, assign distinct identifiers (for example, append `_A`, `_B`, etc.) to ensure proper complex prediction. The same limitation exists in `cartesian` mode; however, duplicate sequences are inherently nonsensical for this configuration.
+
 ## Cluster Configuration
 
 The pipeline now uses a **cluster configuration JSON** to define paths, SLURM partitions, and GPU profiles. This centralizes settings that are unlikely to change frequently.  
