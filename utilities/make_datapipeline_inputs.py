@@ -15,10 +15,6 @@ first_seen_sequences = {}
 file_index = 0
 
 
-import os
-import json
-import sys
-
 def check_existing_monomer_data(protein_name):
     """
     Returns True if monomer_data/{protein_name}_data.json exists
