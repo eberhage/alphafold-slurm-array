@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=AF3_datapipeline
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=128G
+#SBATCH --mem=64G
 #SBATCH --time=06:00:00
 #SBATCH --ntasks=1
 #SBATCH --threads-per-core=1                    # Disable Multithreading
@@ -39,18 +39,13 @@ if [[ "$SLURM_ARRAY_TASK_ID" -eq 0 ]]; then
 fi
 # -- End of Task 0 only ---
 
-# Extract the protein name from the JSON
-NAME=$(jq -r '.name' "$AF3_input_path"/"$AF3_input_file")
-
-if [[ -f "$AF3_output_path"/"$NAME"_data.json ]]; then
-    echo "MSA "$NAME"_data.json already exists. Skipping."
-    exit 0
-fi
-
 mkdir -p "$APPTAINER_TMPDIR"
 mkdir -p "$AF3_output_path"
 
 export APPTAINER_BINDPATH="/${AF3_input_path}:/root/af_input,${AF3_output_path}:/root/af_output,${AF3_MODEL_PATH}:/root/models,${AF3_DB_PATH}:/root/public_databases"
+
+# Extract the protein name from the JSON
+NAME=$(jq -r '.name' "$AF3_input_path"/"$AF3_input_file")
 
 echo "Running AlphaFold job for ${NAME} (index ${SLURM_ARRAY_TASK_ID}, total index ${DATA_PIPELINE_ID})"
 

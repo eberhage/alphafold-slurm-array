@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # Parse cluster settings
 export AF3_CONTAINER_PATH=$(jq -r '.af3_container_path' "$CLUSTER_CONFIG")
@@ -166,7 +167,22 @@ if (( OUR_ARRAY_SIZE == 0 )); then
 
 fi
 
-python3 utilities/make_datapipeline_inputs.py
+# Run the Python script and capture how many JSONs were created
+created_jsons=$(python3 utilities/make_datapipeline_inputs.py)
+
+# Ensure it's an integer
+if ! [[ "$created_jsons" =~ ^[0-9]+$ ]]; then
+    echo "Error: make_datapipeline_inputs.py did not return a valid number. Got: '$created_jsons'" >&2
+    exit 1
+fi
+
+# Compare with the total and print an explanation if they differ
+if [[ "$created_jsons" -lt "$TOTAL_DATAPIPELINE_JOBS" ]]; then
+    already_there=$(( TOTAL_DATAPIPELINE_JOBS - created_jsons ))
+    echo "Only $created_jsons job(s) for the datapipeline stage was/were generated because monomer data for $already_there job(s) was already present."
+    echo "If you wish to recreate the data, remove it before pipeline submission."
+    export TOTAL_DATAPIPELINE_JOBS=$created_jsons
+fi
 
 if [[ -n "${DATAPIPELINE_STATISTICS_FILE:-}" ]]; then
     # Rotate existing statistics file if it exists
