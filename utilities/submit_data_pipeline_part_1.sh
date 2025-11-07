@@ -184,23 +184,28 @@ if [[ "$created_jsons" -lt "$TOTAL_DATAPIPELINE_JOBS" ]]; then
     export TOTAL_DATAPIPELINE_JOBS=$created_jsons
 fi
 
-if [[ -n "${DATAPIPELINE_STATISTICS_FILE:-}" ]]; then
-    # Rotate existing statistics file if it exists
-    if [ -f "$DATAPIPELINE_STATISTICS_FILE" ]; then
-        backup="${DATAPIPELINE_STATISTICS_FILE}.old"
-        i=1
-        # Find the first unused backup name
-        while [ -f "$backup" ]; do
-            backup="${DATAPIPELINE_STATISTICS_FILE}.${i}.old"
-            i=$((i+1))
-        done
-        mv "$DATAPIPELINE_STATISTICS_FILE" "$backup"
+if (( TOTAL_DATAPIPELINE_JOBS > 0 )); then
+    if [[ -n "${DATAPIPELINE_STATISTICS_FILE:-}" ]]; then
+        # Rotate existing statistics file if it exists
+        if [ -f "$DATAPIPELINE_STATISTICS_FILE" ]; then
+            backup="${DATAPIPELINE_STATISTICS_FILE}.old"
+            i=1
+            # Find the first unused backup name
+            while [ -f "$backup" ]; do
+                backup="${DATAPIPELINE_STATISTICS_FILE}.${i}.old"
+                i=$((i+1))
+            done
+            mv "$DATAPIPELINE_STATISTICS_FILE" "$backup"
+        fi
+        echo "datapipeline_id,datapipeline_name,job_id,task_id,node,sequence_length,start_time,end_time" > "$DATAPIPELINE_STATISTICS_FILE"
     fi
-    echo "datapipeline_id,datapipeline_name,job_id,task_id,node,sequence_length,start_time,end_time" > "$DATAPIPELINE_STATISTICS_FILE"
-fi
 
-# Submit only the first chunk; recursion handled inside af3_datapipeline_only_slurm.sh
-sbatch --array=0-$(( MAX_ARRAY_SIZE < TOTAL_DATAPIPELINE_JOBS ? MAX_ARRAY_SIZE-1 : TOTAL_DATAPIPELINE_JOBS-1 )) \
-       --partition=${DATAPIPELINE_PARTITION} \
-       --export=ALL,START_OFFSET=0 \
-       utilities/af3_datapipeline_only_slurm.sh
+    # Submit only the first chunk; recursion handled inside af3_datapipeline_only_slurm.sh
+    sbatch --array=0-$(( MAX_ARRAY_SIZE < TOTAL_DATAPIPELINE_JOBS ? MAX_ARRAY_SIZE-1 : TOTAL_DATAPIPELINE_JOBS-1 )) \
+           --partition=${DATAPIPELINE_PARTITION} \
+           --export=ALL,START_OFFSET=0 \
+           utilities/af3_datapipeline_only_slurm.sh
+else
+    echo "Datapipeline stage was skipped completely."
+    sbatch utilities/submit_data_pipeline_part_2.sh
+fi

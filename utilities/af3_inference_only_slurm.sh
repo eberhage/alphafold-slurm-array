@@ -83,12 +83,35 @@ if [[ -n "${INFERENCE_STATISTICS_FILE:-}" && -f "$INFERENCE_STATISTICS_FILE" ]];
         exit
     }')
 
-    read iptm ptm ranking_score < <(
-        jq -r '[.iptm, .ptm, .ranking_score] | @tsv' "${INFERENCE_DIR}/${INFERENCE_NAME}_summary_confidences.json"
+    # extract best prediction scores
+    read best_iptm best_ptm best_ranking_score < <(
+        jq -r '[.iptm, .ptm, .ranking_score] | @tsv' \
+        "${INFERENCE_DIR}/${INFERENCE_NAME}_summary_confidences.json"
     )
 
-    # write statistics
-    echo "${GPU_PROFILE},${INFERENCE_ID},${INFERENCE_NAME},${SLURM_ARRAY_JOB_ID},${SLURM_ARRAY_TASK_ID},$(hostname),${tokens},${bucket_size},${iptm},${ptm},${ranking_score},${start_time},${end_time}" >> $INFERENCE_STATISTICS_FILE
+    # collect per-model scores
+    scores=$(find "${INFERENCE_DIR}" -type f -path "${INFERENCE_DIR}/seed-*_sample-*/${INFERENCE_NAME}_seed-*_sample-*_summary_confidences.json")
+
+    # compute averages + stddevs
+    if [[ -n "$scores" ]]; then
+        read avg_iptm std_iptm avg_ptm std_ptm avg_rank std_rank < <(
+            jq -s -r '
+                [.[].iptm] as $iptm |
+                [.[].ptm] as $ptm |
+                [.[].ranking_score] as $rank |
+                def mean(a): (a | add / length);
+                def std(a): if (a | length) > 1 then ((a | map((. - (a | add / (a | length))) * (. - (a | add / (a | length)))) | add) / ((a | length) - 1)) | sqrt else 0 end;
+                [ mean($iptm), std($iptm),
+                  mean($ptm), std($ptm),
+                  mean($rank), std($rank) ] | map((. * 10000 | round) / 10000) | @tsv
+            ' $scores
+        )
+    else
+        avg_iptm= avg_ptm= avg_rank= std_iptm= std_ptm= std_rank=
+    fi
+
+    # write statistics (added averages + stddevs)
+    echo "${GPU_PROFILE},${INFERENCE_ID},${INFERENCE_NAME},${SLURM_ARRAY_JOB_ID},${SLURM_ARRAY_TASK_ID},$(hostname),${tokens},${bucket_size},${best_iptm},${best_ptm},${best_ranking_score},${avg_iptm},${std_iptm},${avg_ptm},${std_ptm},${avg_rank},${std_rank},${start_time},${end_time}" >> "$INFERENCE_STATISTICS_FILE"
 fi
 
 rm -rf $AF3_cache_path
