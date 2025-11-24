@@ -12,6 +12,11 @@
     "80g": {
       "gres": "a100-80g",
       "token_limit": 5120
+    },
+    "80g-XLA": {
+      "gres": "a100-80g",
+      "token_limit": 6000,
+      "enable_xla": true
     }
   }
 }

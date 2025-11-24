@@ -57,6 +57,14 @@ mkdir -p "$APPTAINER_TMPDIR"
 python3 utilities/copy_json_and_dependency_files.py $user_input_file "$AF3_input_path"
 rm $user_input_file
 
+if [[ "$ENABLE_XLA" == "true" ]]; then
+    echo "XLA activated"
+    export APPTAINERENV_XLA_PYTHON_CLIENT_PREALLOCATE=false
+    export APPTAINERENV_TF_FORCE_UNIFIED_MEMORY=true
+    export APPTAINERENV_XLA_CLIENT_MEM_FRACTION=3.2
+else
+    echo "XLA not activated"
+fi
 export APPTAINER_BINDPATH="/${AF3_input_path}:/root/af_input,${AF3_output_path}:/root/af_output,${AF3_MODEL_PATH}:/root/models,${AF3_DB_PATH}:/root/public_databases,${AF3_cache_path}:/root/jax_cache_dir"
 
 # Extract the protein name from the JSON

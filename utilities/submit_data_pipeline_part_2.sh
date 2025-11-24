@@ -35,7 +35,7 @@ TOO_BIG_JOBS=$(echo "$json_output" | jq -r '.too_big_jobs | length')
 IFS=',' read -ra GPU_PROFILES_ARRAY <<< "$GPU_PROFILES"
 
 # Extract jobs per profile into associative arrays
-declare -A JOB_COUNTS BOUND_MIN BOUND_MAX GPU_GRES
+declare -A JOB_COUNTS BOUND_MIN BOUND_MAX
 for profile in "${GPU_PROFILES_ARRAY[@]}"; do
     # Check profile exists in JSON
     if ! echo "$json_output" | jq -e --arg p "$profile" '.profiles | has($p)' >/dev/null; then
@@ -46,7 +46,6 @@ for profile in "${GPU_PROFILES_ARRAY[@]}"; do
     JOB_COUNTS[$profile]=$(echo "$json_output" | jq -r --arg p "$profile" '.profiles[$p].jobs')
     BOUND_MIN[$profile]=$(echo "$json_output" | jq -r --arg p "$profile" '.profiles[$p].min')
     BOUND_MAX[$profile]=$(echo "$json_output" | jq -r --arg p "$profile" '.profiles[$p].max')
-    GPU_GRES[$profile]=$(jq -r --arg p "$profile" '.gpu_profiles[$p].gres' "$CLUSTER_CONFIG")
 done
 
 # Logging
@@ -75,7 +74,8 @@ fi
 # Loop over all selected GPU profiles
 for profile in "${GPU_PROFILES_ARRAY[@]}"; do
     job_count=${JOB_COUNTS[$profile]:-0}
-    gpu_type=${GPU_GRES[$profile]}
+    gpu_type=$(jq -r --arg p "$profile" '.gpu_profiles[$p].gres' "$CLUSTER_CONFIG")
+    enable_xla=$(jq -r --arg p "$profile" '.gpu_profiles[$p].enable_xla // false' "$CLUSTER_CONFIG")
 
     if [[ $job_count -gt 0 ]]; then
         first_chunk_size=$(( job_count < OUR_ARRAY_SIZE ? job_count : OUR_ARRAY_SIZE ))
@@ -83,7 +83,7 @@ for profile in "${GPU_PROFILES_ARRAY[@]}"; do
         sbatch --array=0-$(( first_chunk_size - 1 )) \
                --partition="${INFERENCE_PARTITION}" \
                --gres=gpu:${gpu_type}:1 \
-               --export=ALL,TOTAL_INFERENCE_JOBS=$job_count,START_OFFSET=0,GPU_PROFILE=$profile,GPU_TYPE=$gpu_type \
+               --export=ALL,TOTAL_INFERENCE_JOBS=$job_count,START_OFFSET=0,GPU_PROFILE=$profile,GPU_TYPE=$gpu_type,ENABLE_XLA=$enable_xla \
                utilities/af3_inference_only_slurm.sh
     else
         echo "No jobs to submit for GPU profile '$profile'."
