@@ -5,11 +5,15 @@
   "datapipeline_partition": "leinecpu_lowprio",
   "inference_partition": "leinegpu_lowprio",
   "gpu_profiles": {
-    "small": {
+    "10g": {
+      "gres": "a100-10g",
+      "token_limit": 1280
+    },
+    "40g": {
       "gres": "a100-40g",
       "token_limit": 3072
     },
-    "large": {
+    "80g": {
       "gres": "a100-80g",
       "token_limit": 5120
     }

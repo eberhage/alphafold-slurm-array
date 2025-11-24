@@ -44,7 +44,7 @@ The following parameters are set inside submit_data_pipeline.sh:
 | `RESULTS_PER_DIR`              | Number of results to bundle per directory. Naming scheme: `results/<SLURM_ARRAY_JOB_ID>_x-y`.                                                                                     |
 | `SORTING`                      | How to order protein chains within a dimension:<br><ul><li>`alpha`: alphabetically by protein key</li><li>`input`: preserve order from `input.json`</li></ul>                     |
 | `CLUSTER_CONFIG`               | Path to your cluster configuration JSON file (see [below](#cluster-configuration)).                                                                                               |
-| `GPU_PROFILES`                 | Comma-separated list of GPU profiles from cluster configuration to use for job assignment (e.g., `"small,large"`).                                                                |
+| `GPU_PROFILES`                 | Comma-separated list of GPU profiles from cluster configuration to use for job assignment (e.g., `"40g,80g"`).                                                                |
 | `DATAPIPELINE_STATISTICS_FILE` | CSV file where statistics from the **data pipeline** stage will be stored (default: `datapipeline_statistics.csv`).                                                               |
 | `INFERENCE_STATISTICS_FILE`    | CSV file where statistics from the **inference** stage will be stored (default: `inference_statistics.csv`).                                                                      |
 | `POSTPROCESSING_SCRIPT`        | Optional script that runs after each inference job. It has access to environment variables such as `INFERENCE_NAME`, `INFERENCE_DIR`, and `INFERENCE_ID`. Leave empty to disable. |
@@ -85,11 +85,11 @@ The pipeline now uses a **cluster configuration JSON** to define paths, SLURM pa
   "datapipeline_partition": "cpupartition",
   "inference_partition": "gpupartition",
   "gpu_profiles": {
-    "small": {
+    "40g": {
       "gres": "a100-40g",
       "token_limit": 3072
     },
-    "large": {
+    "80g": {
       "gres": "a100-80g",
       "token_limit": 5120
     }
@@ -118,7 +118,7 @@ The AlphaFold jobs are sorted into a result directory with the following structu
 
 ```bash
 results/
- ├── <SLURM_ARRAY_JOB_ID>_0-249/
+ ├── <SLURM_ARRAY_JOB_ID>_<GPU_PROFILE>_0-249/
  │    ├── <inference_job_name>/
  │    │    ├── seed-0_sample-0/
  │    │    │    ├── <inference_job_name>_seed-0_sample-0_confidences.json

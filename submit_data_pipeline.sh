@@ -19,7 +19,7 @@ export SORTING="alpha"
 export CLUSTER_CONFIG="cluster_config.json"
 
 # Choose which GPU profiles from cluster config to use
-export GPU_PROFILES="small,large"
+export GPU_PROFILES="40g,80g"
 
 # Datapipeline (MSA, template search) statistics file
 export DATAPIPELINE_STATISTICS_FILE="datapipeline_statistics.csv"

@@ -26,7 +26,7 @@ WORKDIR=$(pwd)
 user_input_file=$WORKDIR/pending_jobs/${GPU_PROFILE}/${INFERENCE_ID}_*.json
 AF3_input_file=$(basename $user_input_file)
 AF3_input_path=$WORKDIR/tmp/input_${SLURM_ARRAY_JOB_ID}/${SLURM_ARRAY_TASK_ID}
-AF3_output_path=$WORKDIR/results/${SLURM_ARRAY_JOB_ID}_${bucket_start}-${bucket_end}
+AF3_output_path=$WORKDIR/results/${SLURM_ARRAY_JOB_ID}_${GPU_PROFILE}_${bucket_start}-${bucket_end}
 AF3_cache_path=$WORKDIR/tmp/af3_cache_${SLURM_ARRAY_JOB_ID}/${SLURM_ARRAY_TASK_ID} # Cache directory
 export APPTAINER_TMPDIR=$WORKDIR/tmp/apptainer_${SLURM_ARRAY_JOB_ID}/${SLURM_ARRAY_TASK_ID}
 

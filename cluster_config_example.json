@@ -5,11 +5,11 @@
   "datapipeline_partition": "cpupartition",
   "inference_partition": "gpupartition",
   "gpu_profiles": {
-    "small": {
+    "40g": {
       "gres": "a100-40g",
       "token_limit": 3072
     },
-    "large": {
+    "80g": {
       "gres": "a100-80g",
       "token_limit": 5120
     }
