@@ -38,14 +38,14 @@ IFS=',' read -ra GPU_PROFILES_ARRAY <<< "$GPU_PROFILES"
 declare -A JOB_COUNTS BOUND_MIN BOUND_MAX GPU_GRES
 for profile in "${GPU_PROFILES_ARRAY[@]}"; do
     # Check profile exists in JSON
-    if ! echo "$json_output" | jq -e ".profiles | has(\"$profile\")" >/dev/null; then
+    if ! echo "$json_output" | jq -e --arg p "$profile" '.profiles | has($p)' >/dev/null; then
         echo "Error: Profile '$profile' missing in JSON output" >&2
         exit 1
     fi
 
-    JOB_COUNTS[$profile]=$(echo "$json_output" | jq -r ".profiles.$profile.jobs")
-    BOUND_MIN[$profile]=$(echo "$json_output" | jq -r ".profiles.$profile.min")
-    BOUND_MAX[$profile]=$(echo "$json_output" | jq -r ".profiles.$profile.max")
+    JOB_COUNTS[$profile]=$(echo "$json_output" | jq -r --arg p "$profile" '.profiles[$p].jobs')
+    BOUND_MIN[$profile]=$(echo "$json_output" | jq -r --arg p "$profile" '.profiles[$p].min')
+    BOUND_MAX[$profile]=$(echo "$json_output" | jq -r --arg p "$profile" '.profiles[$p].max')
     GPU_GRES[$profile]=$(jq -r --arg p "$profile" '.gpu_profiles[$p].gres' "$CLUSTER_CONFIG")
 done
 
