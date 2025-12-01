@@ -106,25 +106,23 @@ for profile in "${GPU_PROFILES_ARRAY[@]}"; do
         exit 1
     fi
 
-    # Parse gres and token_limit
+    # Parse profile data
     gpu_gres=$(jq -r --arg p "$profile" '.gpu_profiles[$p].gres' "$CLUSTER_CONFIG")
-    gpu_limit=$(jq -r --arg p "$profile" '.gpu_profiles[$p].token_limit' "$CLUSTER_CONFIG")
+    token_limit=$(jq -r --arg p "$profile" '.gpu_profiles[$p].token_limit' "$CLUSTER_CONFIG")
     max_minutes=$(jq -r --arg p "$profile" '.gpu_profiles[$p].max_minutes_per_seed' "$CLUSTER_CONFIG")
-    gpu_time=$(( max_minutes * num_seeds ))
 
     # Validate token_limit
-    if ! [[ "$gpu_limit" =~ ^[1-9][0-9]*$ ]]; then
-        echo "Error: token_limit for GPU profile '$profile' is missing or invalid: $gpu_limit" >&2
+    if ! [[ "$token_limit" =~ ^[1-9][0-9]*$ ]]; then
+        echo "Error: token_limit for GPU profile '$profile' is missing or invalid: $token_limit" >&2
         exit 1
     fi
 
-    # Validate gpu_time
-    if ! [[ "$gpu_time" =~ ^[1-9][0-9]*$ ]]; then
+    # Validate max_minutes
+    if ! [[ "$max_minutes" =~ ^[1-9][0-9]*$ ]]; then
         echo "Error: max_minutes_per_seed for GPU profile '$profile' is missing or invalid." >&2
         exit 1
     fi
-
-    # Check SLURM MaxTime
+    gpu_time=$(( max_minutes * num_seeds ))
     if slurm_limit_exceeded "$INFERENCE_PARTITION" "$gpu_time"; then
         echo "Error: Job time for profile '$profile' ($gpu_time minutes) exceeds MaxTime of partition '$INFERENCE_PARTITION'. Please reduce the number of seeds." >&2
         exit 1
