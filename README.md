@@ -87,28 +87,36 @@ The pipeline now uses a **cluster configuration JSON** to define paths, SLURM pa
   "gpu_profiles": {
     "40g": {
       "gres": "a100-40g",
-      "token_limit": 3072
+      "token_limit": 3072,
+      "max_minutes_per_seed": 20
     },
     "80g": {
       "gres": "a100-80g",
-      "token_limit": 5120
+      "token_limit": 5120,
+      "max_minutes_per_seed": 60
+    },
+    "80g-XLA": {
+      "gres": "a100-80g",
+      "token_limit": 6144,
+      "max_minutes_per_seed": 150,
+      "enable_xla": true
     }
   }
 }
 ```
 
-| Field                    | Description                                                                                                                                                                                  |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `af3_container_path`     | Path to the AlphaFold3 container file (`.sif`).                                                                                                                                              |
-| `af3_model_path`         | Path to the directory containing [AlphaFold3 model weights provided by Google-Deepmind](https://docs.google.com/forms/d/e/1FAIpQLSfWZAgo1aYk0O4MuAXZj8xRQ8DafeFJnldNOnh_13qAx2ceZw/viewform).|
-| `af3_db_path`            | Path to the AlphaFold3 databases directory.                                                                                                                                                  |
-| `datapipeline_partition` | SLURM partition used for MSA/template search (CPU jobs).                                                                                                                                     |
-| `inference_partition`    | SLURM partition used for inference (GPU jobs).                                                                                                                                               |
-| `gpu_profiles`           | Dictionary of GPU profiles. Each profile defines: <ul><li>`gres`: GPU resource name in SLURM</li><li>`token_limit`: maximum number of tokens this profile can handle</li></ul>               |
+| Field                    | Description                                                                                                                                                                                                                                                                                |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `af3_container_path`     | Path to the AlphaFold3 container file (`.sif`).                                                                                                                                                                                                                                            |
+| `af3_model_path`         | Path to the directory containing [AlphaFold3 model weights provided by Google-Deepmind](https://docs.google.com/forms/d/e/1FAIpQLSfWZAgo1aYk0O4MuAXZj8xRQ8DafeFJnldNOnh_13qAx2ceZw/viewform).                                                                                              |
+| `af3_db_path`            | Path to the AlphaFold3 databases directory.                                                                                                                                                                                                                                                |
+| `datapipeline_partition` | SLURM partition used for MSA/template search (CPU jobs).                                                                                                                                                                                                                                   |
+| `inference_partition`    | SLURM partition used for inference (GPU jobs).                                                                                                                                                                                                                                             |
+| `gpu_profiles`           | Dictionary of GPU profiles. Each profile defines: <ul><li>`gres`: GPU resource name in SLURM</li><li>`token_limit`: maximum number of tokens this profile can handle</li><li>`max_minutes_per_seed`: Limit of minutes to allocate per seed</li><li>`enable_xla`: default: `false`</li></ul>|
 
 ### Notes on GPU Profiles
 
-- Users may define **any number of GPU profiles**. Each profile must include a valid `gres` and a `token_limit`.
+- Users may define **any number of GPU profiles**. Each profile must include a valid `gres`, `token_limit`, and `max_minutes_per_seed`.
 - The pipeline will automatically **assign jobs to the smallest possible GPU profile** that can handle the total tokens of the job.
 - Token limits allow the pipeline to efficiently distribute jobs across different GPU types.
 

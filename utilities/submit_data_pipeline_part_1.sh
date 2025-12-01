@@ -126,7 +126,7 @@ for profile in "${GPU_PROFILES_ARRAY[@]}"; do
 
     # Check SLURM MaxTime
     if slurm_limit_exceeded "$INFERENCE_PARTITION" "$gpu_time"; then
-        echo "Error: GPU_TIME for profile '$profile' exceeds MaxTime of partition '$INFERENCE_PARTITION'." >&2
+        echo "Error: Job time for profile '$profile' ($gpu_time minutes) exceeds MaxTime of partition '$INFERENCE_PARTITION'. Please reduce the number of seeds." >&2
         exit 1
     fi
 

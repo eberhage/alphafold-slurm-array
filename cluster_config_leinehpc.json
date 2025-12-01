@@ -7,15 +7,24 @@
   "gpu_profiles": {
     "10g": {
       "gres": "a100-10g",
-      "token_limit": 1280
+      "token_limit": 1280,
+      "max_minutes_per_seed": 6
     },
     "40g": {
       "gres": "a100-40g",
-      "token_limit": 3072
+      "token_limit": 3072,
+      "max_minutes_per_seed": 20
     },
     "80g": {
       "gres": "a100-80g",
-      "token_limit": 5120
+      "token_limit": 5120,
+      "max_minutes_per_seed": 60
+    },
+    "80g-XLA": {
+      "gres": "a100-80g",
+      "token_limit": 6144,
+      "max_minutes_per_seed": 150,
+      "enable_xla": true
     }
   }
 }

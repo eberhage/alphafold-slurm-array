@@ -9,7 +9,7 @@ export MODE="cartesian"
 # AlphaFold seeds for the inference step to be used for every job. Comma-separated string.
 export SEEDS="0,1,2"
 
-# Number of results to be bundled as one directory. Naming scheme: results/<job-id>_x-y
+# Number of results to be bundled as one directory. Naming scheme: results/<job-id>_<gpu-profile>_x-y
 export RESULTS_PER_DIR=250
 
 # Sorting options: 'alpha' = use keys of INPUT_FILE alphabetically for the script logic, 'input' = preserve key order from INPUT_FILE.
