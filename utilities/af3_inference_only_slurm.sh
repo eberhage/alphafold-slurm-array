@@ -41,6 +41,7 @@ if [[ "$SLURM_ARRAY_TASK_ID" -eq 0 ]]; then
         sbatch --array=0-$(( next_end - next_start )) \
                --partition=${INFERENCE_PARTITION} \
                --gres=gpu:${GPU_TYPE}:1 \
+               --time=${GPU_TIME} \
                --dependency=afterok:${SLURM_ARRAY_JOB_ID} \
                --export=ALL,START_OFFSET=$next_start \
                $WORKDIR/utilities/af3_inference_only_slurm.sh

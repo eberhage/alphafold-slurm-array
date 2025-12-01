@@ -89,7 +89,7 @@ for profile in "${GPU_PROFILES_ARRAY[@]}"; do
                --partition="${INFERENCE_PARTITION}" \
                --gres=gpu:${gpu_type}:1 \
                --time=${gpu_time} \
-               --export=ALL,TOTAL_INFERENCE_JOBS=$job_count,START_OFFSET=0,GPU_PROFILE=$profile,GPU_TYPE=$gpu_type,ENABLE_XLA=$enable_xla \
+               --export=ALL,TOTAL_INFERENCE_JOBS=$job_count,START_OFFSET=0,GPU_PROFILE=$profile,GPU_TYPE=$gpu_type,ENABLE_XLA=$enable_xla,GPU_TIME=$gpu_time \
                utilities/af3_inference_only_slurm.sh
     else
         echo "No jobs to submit for GPU profile '$profile'."
