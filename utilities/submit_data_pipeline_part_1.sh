@@ -88,8 +88,17 @@ check_gres_in_partition() {
     fi
 }
 
+slurm_limit_exceeded() {
+    max_time=$(scontrol show partition "$1" | awk 'match($0,/MaxTime=([^ ]+)/,a){print a[1]}')
+    [[ $max_time =~ infinite|UNLIMITED ]] && return 0
+    [[ $max_time == *-* ]] && days=${max_time%%-*} time_part=${max_time#*-} || days=0 time_part=$max_time
+    IFS=: read hours minutes seconds <<<"$time_part"
+    (( $2 > days*1440 + hours*60 + minutes ))
+}
+
+IFS=',' read -ra seed_array <<< "$SEEDS"
+num_seeds=${#seed_array[@]}
 IFS=',' read -ra GPU_PROFILES_ARRAY <<< "$GPU_PROFILES"
-declare -A GPU_LIMITS GPU_GRES
 for profile in "${GPU_PROFILES_ARRAY[@]}"; do
     # Check if profile exists in cluster config
     if ! jq -e --arg p "$profile" '.gpu_profiles[$p]' "$CLUSTER_CONFIG" > /dev/null; then
@@ -98,17 +107,31 @@ for profile in "${GPU_PROFILES_ARRAY[@]}"; do
     fi
 
     # Parse gres and token_limit
-    GPU_GRES[$profile]=$(jq -r --arg p "$profile" '.gpu_profiles[$p].gres' "$CLUSTER_CONFIG")
-    GPU_LIMITS[$profile]=$(jq -r --arg p "$profile" '.gpu_profiles[$p].token_limit' "$CLUSTER_CONFIG")
+    gpu_gres=$(jq -r --arg p "$profile" '.gpu_profiles[$p].gres' "$CLUSTER_CONFIG")
+    gpu_limit=$(jq -r --arg p "$profile" '.gpu_profiles[$p].token_limit' "$CLUSTER_CONFIG")
+    max_minutes=$(jq -r --arg p "$profile" '.gpu_profiles[$p].max_minutes_per_seed' "$CLUSTER_CONFIG")
+    gpu_time=$(( max_minutes * num_seeds ))
 
-    # Check if token_limit is a valid positive integer
-    if ! [[ "${GPU_LIMITS[$profile]}" =~ ^[1-9][0-9]*$ ]]; then
-        echo "Error: token_limit for GPU profile '$profile' is missing or invalid: ${GPU_LIMITS[$profile]}" >&2
+    # Validate token_limit
+    if ! [[ "$gpu_limit" =~ ^[1-9][0-9]*$ ]]; then
+        echo "Error: token_limit for GPU profile '$profile' is missing or invalid: $gpu_limit" >&2
         exit 1
     fi
 
-    # Check if gres exists in the partition
-    check_gres_in_partition "$INFERENCE_PARTITION" "${GPU_GRES[$profile]}" "$profile"
+    # Validate gpu_time
+    if ! [[ "$gpu_time" =~ ^[1-9][0-9]*$ ]]; then
+        echo "Error: max_minutes_per_seed for GPU profile '$profile' is missing or invalid." >&2
+        exit 1
+    fi
+
+    # Check SLURM MaxTime
+    if slurm_limit_exceeded "$INFERENCE_PARTITION" "$gpu_time"; then
+        echo "Error: GPU_TIME for profile '$profile' exceeds MaxTime of partition '$INFERENCE_PARTITION'." >&2
+        exit 1
+    fi
+
+    # Check if gres exists in partition
+    check_gres_in_partition "$INFERENCE_PARTITION" "$gpu_gres" "$profile"
 done
 
 #########################################################################################################################
