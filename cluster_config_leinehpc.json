@@ -8,7 +8,7 @@
     "10g": {
       "gres": "a100-10g",
       "token_limit": 1280,
-      "max_minutes_per_seed": 6
+      "max_minutes_per_seed": 15
     },
     "40g": {
       "gres": "a100-40g",
