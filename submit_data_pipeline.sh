@@ -15,17 +15,21 @@ export RESULTS_PER_DIR=250
 # Sorting options: 'alpha' = use keys of INPUT_FILE alphabetically for the script logic, 'input' = preserve key order from INPUT_FILE.
 export SORTING="alpha"
 
+# Screen file with compounds in SMILE format. See README.md for file specifications. The pipeline will run once for every compound.
+export SCREEN_FILE="screen.json"
+export MAX_COMPOUND_ATOMS=50
+
 # where to find the cluster specific settings for this pipeline
 export CLUSTER_CONFIG="cluster_config.json"
 
 # Choose which GPU profiles from cluster config to use
 export GPU_PROFILES="40g,80g"
 
-# Datapipeline (MSA, template search) statistics file
+# Datapipeline (MSA, template search) statistics file (simple CSV)
 export DATAPIPELINE_STATISTICS_FILE="datapipeline_statistics.csv"
 
-# Inference (protein structure prediction) statistics file
-export INFERENCE_STATISTICS_FILE="inference_statistics.csv"
+# Inference (protein structure prediction) statistics file (JSONL)
+export INFERENCE_STATISTICS_FILE="inference_statistics.jsonl"
 
 # Optional postprocessing script that runs after every inference job and has access to environment variables such as
 # INFERENCE_NAME, INFERENCE_DIR and INFERENCE_ID. Leave empty if no postprocessing should be done.

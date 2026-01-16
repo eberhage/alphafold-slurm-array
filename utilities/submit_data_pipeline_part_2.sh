@@ -17,7 +17,8 @@ if [[ -n "${INFERENCE_STATISTICS_FILE:-}" ]]; then
         done
         mv "$INFERENCE_STATISTICS_FILE" "$backup"
     fi
-    echo "gpu_profile,inference_id,inference_name,job_id,task_id,node,tokens,bucket_size,best_iptm,best_ptm,best_ranking_score,avg_iptm,stdev_iptm,avg_ptm,stdev_ptm,avg_ranking_score,stdev_ranking_score,start_time,end_time" > "$INFERENCE_STATISTICS_FILE"
+    touch $INFERENCE_STATISTICS_FILE
+    # echo "gpu_profile,inference_id,inference_name,job_id,task_id,node,tokens,bucket_size,best_iptm,best_ptm,best_ranking_score,avg_iptm,stdev_iptm,avg_ptm,stdev_ptm,avg_ranking_score,stdev_ranking_score,start_time,end_time" > "$INFERENCE_STATISTICS_FILE"
 fi
 
 # ------------------------------

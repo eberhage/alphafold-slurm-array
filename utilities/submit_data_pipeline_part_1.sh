@@ -57,6 +57,12 @@ elif [[ ! -f "$INPUT_FILE" ]]; then
     exit 1
 fi
 
+# if we have a SCREEN_FILE set, it must exist and be readable
+if [[ -n "${SCREEN_FILE:-}" && ! -f "$SCREEN_FILE" ]]; then
+    echo "ERROR: SCREEN_FILE '$SCREEN_FILE' not found." >&2
+    exit 1
+fi
+
 if ! [[ "${SEEDS:-}" =~ ^[0-9]+(,[0-9]+)*$ ]]; then
     echo "ERROR: SEEDS must be a comma-separated list of integers (e.g. 0,1,2)." >&2
     exit 1
@@ -144,6 +150,23 @@ if ! output=$(python3 utilities/analyze_job_input_json.py "$INPUT_FILE" "$MODE")
 fi
 
 read TOTAL_DATAPIPELINE_JOBS TOTAL_INFERENCE_JOBS <<< "$output"
+
+if [[ -n "${SCREEN_FILE:-}" ]]; then
+    if ! output_screen=$(python3 utilities/validate_screen_json.py "$SCREEN_FILE" "$MAX_COMPOUND_ATOMS"); then
+        echo "Validation of screen file failed. Aborting."
+        exit 1
+    fi
+
+    read total_compounds valid_compounds <<< "$output_screen"
+
+    if [[ "$valid_compounds" =~ ^[1-9][0-9]*$ ]]; then
+        TOTAL_INFERENCE_JOBS=$((TOTAL_INFERENCE_JOBS * valid_compounds))
+        echo "Found $valid_compounds valid compounds in the screen."
+    else
+        echo "WARNING: No valid compounds found in screen. The pipeline will continue without compound screening."
+    fi
+fi
+
 export TOTAL_DATAPIPELINE_JOBS TOTAL_INFERENCE_JOBS
 NUM_DIMENSIONS=$(jq 'length' "$INPUT_FILE")
 
@@ -154,7 +177,13 @@ elif [[ "$MODE" == "collapsed" ]]; then
 fi
 
 echo
-echo "$TOTAL_DATAPIPELINE_JOBS unique sequence(s) found across $NUM_DIMENSIONS dimension(s). Generating $TOTAL_INFERENCE_JOBS job(s) using mode: $MODE_DESC."
+echo "$TOTAL_DATAPIPELINE_JOBS unique sequence(s) found across $NUM_DIMENSIONS dimension(s)."
+echo
+if [[ -n "${SCREEN_FILE:-}" && "$valid_compounds" =~ ^[1-9][0-9]*$ ]]; then
+    echo "Multiplying with 1 extra dimension containing $valid_compounds compounds."
+    echo
+fi
+echo "Generating $TOTAL_INFERENCE_JOBS job(s) using mode: $MODE_DESC."
 echo
 
 read -r -p "Do you want to continue? [Y/n] " answer

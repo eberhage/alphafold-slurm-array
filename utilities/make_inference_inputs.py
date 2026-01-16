@@ -3,12 +3,14 @@ import os
 import sys
 import itertools
 import copy
+from rdkit import Chem
 
-monomer_dir = "monomer_data"
-INFERENCE_JOBS_DIR = "pending_jobs"
-TOO_BIG_FILE = "too_big.json"
-msas_dir = "msas"
-templates_dir = "templates"
+def count_total_atoms(smiles):
+    """Count total atoms (including hydrogens) in SMILES using RDKit."""
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return float('inf')  # Invalid SMILES ? skip
+    return mol.GetNumAtoms()
 
 def dumps_compact_lists(obj, indent=2):
     def _dump(o, level=0):
@@ -37,8 +39,44 @@ def dump_compact_lists(obj, filename, indent=2):
 
 def chain_id(idx: int) -> str:
     if idx >= 26:
-        raise ValueError("Too many proteins in a job (max 26 supported: A–Z).")
+        raise ValueError("Too many proteins in a job (max 26 supported: A-Z).")
     return chr(65 + idx)
+
+def load_valid_compounds(screen_file, max_atoms):
+    valid_compounds = []
+
+    if not screen_data:
+        return None
+
+    try:
+        with open(screen_file, 'r') as f:
+            screen_data = json.load(f)
+    except Exception as e:
+        print(f"Error: Failed to read SCREEN_FILE '{screen_file}': {e}", file=sys.stderr)
+        sys.exit(1)
+
+    for i, item in enumerate(screen_data):
+        if not isinstance(item, dict):
+            print(f"Warning: Item {i} is not a dictionary. Skipping.", file=sys.stderr)
+            continue
+
+        if 'ID' not in item:
+            print(f"Warning: Item {i} missing 'ID' key. Skipping.", file=sys.stderr)
+            continue
+
+        compound_id = item['ID']
+        smiles = item.get('SMILES', '')
+
+        if not smiles:
+            continue
+
+        num_atoms = count_total_atoms(smiles)
+        if max_atoms and num_atoms > max_atoms:
+            continue
+
+        valid_compounds.append({"ID": compound_id, "SMILES": smiles, "Atoms": num_atoms})
+
+    return valid_compounds
 
 def main():
     # Read environment variables
@@ -46,6 +84,13 @@ def main():
     SEEDS = os.environ["SEEDS"]
     MODE = os.environ["MODE"]
     SORTING = os.environ.get("SORTING", "input")
+    SCREEN_FILE = os.environ.get("SCREEN_FILE", None)
+    MAX_COMPOUND_ATOMS = os.environ.get("MAX_COMPOUND_ATOMS", None)
+    monomer_dir = "monomer_data"
+    INFERENCE_JOBS_DIR = "pending_jobs"
+    TOO_BIG_FILE = "too_big.json"
+    msas_dir = "msas"
+    templates_dir = "templates"
 
     # Load cluster config
     CLUSTER_CONFIG = os.environ["CLUSTER_CONFIG"]
@@ -128,7 +173,16 @@ def main():
         iterator = key_lists
     else:
         raise ValueError("MODE must be 'cartesian' or 'collapsed'.")
+    
+    compound_list = load_valid_compounds(SCREEN_FILE, MAX_COMPOUND_ATOMS)
 
+    if not compound_list:
+        maxchains = 26 
+    else:
+        maxchains = 25
+    
+
+########## proceed HEEERE
     for choice in iterator:
         choice_tuple = tuple(choice)
         canon = tuple(sorted(choice))
@@ -136,8 +190,8 @@ def main():
             continue
         seen.add(canon)
 
-        if len(choice_tuple) > 26:
-            raise ValueError("Job has more than 26 proteins, cannot assign chain IDs beyond Z.")
+        if len(choice_tuple) > maxchains:
+            raise ValueError("Job has more than 26 chains, cannot assign chain IDs beyond Z.")
 
         sequences = []
         for pos, protein in enumerate(choice_tuple):
