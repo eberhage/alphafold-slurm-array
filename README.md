@@ -191,7 +191,7 @@ The file <job_name>_summary_confidences.json contains model quality metrics such
 - ptm
 - ranking_score
 
-These values are automatically collected into the statistics CSV file for downstream analysis.
+The content of this file is automatically collected into the statistics JSONL file for downstream analysis.
 
 ## Example Workflow
 
