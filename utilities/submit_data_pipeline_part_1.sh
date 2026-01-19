@@ -239,19 +239,8 @@ if [[ "$created_jsons" -lt "$TOTAL_DATAPIPELINE_JOBS" ]]; then
 fi
 
 if (( TOTAL_DATAPIPELINE_JOBS > 0 )); then
-    if [[ -n "${DATAPIPELINE_STATISTICS_FILE:-}" ]]; then
-        # Rotate existing statistics file if it exists
-        if [ -f "$DATAPIPELINE_STATISTICS_FILE" ]; then
-            backup="${DATAPIPELINE_STATISTICS_FILE}.old"
-            i=1
-            # Find the first unused backup name
-            while [ -f "$backup" ]; do
-                backup="${DATAPIPELINE_STATISTICS_FILE}.${i}.old"
-                i=$((i+1))
-            done
-            mv "$DATAPIPELINE_STATISTICS_FILE" "$backup"
-        fi
-        echo "datapipeline_id,datapipeline_name,job_id,task_id,node,sequence_length,start_time,end_time" > "$DATAPIPELINE_STATISTICS_FILE"
+    if [[ -n "${DATAPIPELINE_STATISTICS_FILE:-}" && ! -f "$DATAPIPELINE_STATISTICS_FILE" ]]; then
+        echo "pipeline_run_id,datapipeline_id,datapipeline_name,job_id,task_id,node,sequence_length,start_time,end_time" > "$DATAPIPELINE_STATISTICS_FILE"
     fi
 
     # Submit only the first chunk; recursion handled inside af3_datapipeline_only_slurm.sh

@@ -62,9 +62,7 @@ apptainer exec --writable-tmpfs --nv ${AF3_CONTAINER_PATH} python /app/alphafold
 if [[ -n "${DATAPIPELINE_STATISTICS_FILE:-}" && -f "$DATAPIPELINE_STATISTICS_FILE" ]]; then
     end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     sequence_length=$(jq -r '.sequences[0].protein.sequence | length' "$AF3_input_path"/"$AF3_input_file")
-
-    # write statistics
-    echo "${DATA_PIPELINE_ID},${NAME},${SLURM_ARRAY_JOB_ID},${SLURM_ARRAY_TASK_ID},$(hostname),${sequence_length},${start_time},${end_time}" >> $DATAPIPELINE_STATISTICS_FILE
+    echo "${PIPELINE_RUN_ID},${DATA_PIPELINE_ID},${NAME},${SLURM_ARRAY_JOB_ID},${SLURM_ARRAY_TASK_ID},$(hostname),${sequence_length},${start_time},${end_time}" >> $DATAPIPELINE_STATISTICS_FILE
 fi
 
 rm -rf $APPTAINER_TMPDIR

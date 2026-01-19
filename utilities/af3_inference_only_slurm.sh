@@ -93,7 +93,8 @@ if [[ -n "${INFERENCE_STATISTICS_FILE:-}" && -f "$INFERENCE_STATISTICS_FILE" ]];
 
     confidences=$(python $WORKDIR/utilities/collect_af3_confidences.py "${INFERENCE_DIR}" "${INFERENCE_NAME}")
 
-    jq -cn  --arg profile "$GPU_PROFILE" \
+    jq -cn  --arg runid "$PIPELINE_RUN_ID" \
+            --arg profile "$GPU_PROFILE" \
             --argjson a "$INFERENCE_ID" \
         	--arg b "$INFERENCE_NAME" \
             --argjson c "$SLURM_ARRAY_JOB_ID" \
@@ -104,7 +105,7 @@ if [[ -n "${INFERENCE_STATISTICS_FILE:-}" && -f "$INFERENCE_STATISTICS_FILE" ]];
             --arg h "$start_time" \
             --arg i "$end_time" \
             --argjson confidences "$confidences" \
-            '{"gpu_profile": $profile,"inference_id": $a, "name": $b, "array_job": $c, "array_task": $d, "hostname": $e, "tokens": $f, "bucket_size": $g, "start_time": $h, "end_time": $i, "af3_confidences": $confidences}' >> "$INFERENCE_STATISTICS_FILE"
+            '{"pipeline_run_id": $runid,"gpu_profile": $profile,"inference_id": $a, "name": $b, "array_job": $c, "array_task": $d, "hostname": $e, "tokens": $f, "bucket_size": $g, "start_time": $h, "end_time": $i, "af3_confidences": $confidences}' >> "$INFERENCE_STATISTICS_FILE"
 fi
 
 rm -rf $AF3_cache_path

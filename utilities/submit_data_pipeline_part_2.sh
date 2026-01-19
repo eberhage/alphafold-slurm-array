@@ -3,23 +3,7 @@
 #SBATCH --time=01:00:00
 #SBATCH --output=slurm-output/slurm-%j-%x.out # %j (Job ID) %x (Job Name)
 
-rm -rf data_pipeline_inputs
-
-if [[ -n "${INFERENCE_STATISTICS_FILE:-}" ]]; then
-    # Rotate existing statistics file if it exists
-    if [ -f "$INFERENCE_STATISTICS_FILE" ]; then
-        backup="${INFERENCE_STATISTICS_FILE}.old"
-        i=1
-        # Find the first unused backup name
-        while [ -f "$backup" ]; do
-            backup="${INFERENCE_STATISTICS_FILE}.${i}.old"
-            i=$((i+1))
-        done
-        mv "$INFERENCE_STATISTICS_FILE" "$backup"
-    fi
-    touch $INFERENCE_STATISTICS_FILE
-    # echo "gpu_profile,inference_id,inference_name,job_id,task_id,node,tokens,bucket_size,best_iptm,best_ptm,best_ranking_score,avg_iptm,stdev_iptm,avg_ptm,stdev_ptm,avg_ranking_score,stdev_ranking_score,start_time,end_time" > "$INFERENCE_STATISTICS_FILE"
-fi
+rm -rf data_pipeline_inputs/$PIPELINE_RUN_ID
 
 # ------------------------------
 # Phase 1: Run make_inference_inputs.py and parse job info
@@ -74,6 +58,10 @@ num_seeds=${#seed_array[@]}
 # ------------------------------
 # Phase 2: Submit inference jobs
 # ------------------------------
+
+if [[ -n "${INFERENCE_STATISTICS_FILE:-}" && ! -f "$INFERENCE_STATISTICS_FILE" ]]; then
+    touch $INFERENCE_STATISTICS_FILE
+fi
 
 # Loop over all selected GPU profiles
 for profile in "${GPU_PROFILES_ARRAY[@]}"; do
