@@ -44,7 +44,7 @@ The following parameters are set inside submit_data_pipeline.sh:
 | `RESULTS_PER_DIR`              | Number of results to bundle per directory. Naming scheme: `results/<SLURM_ARRAY_JOB_ID>_<GPU_PROFILE>_x-<x+RESULTS_PER_DIR-1>`. |
 | `SORTING`                      | How to order protein chains within a dimension:<br><ul><li>`alpha`: alphabetically by protein key</li><li>`input`: preserve order from `input.json`</li></ul> |
 | `SCREEN_FILE`                  | Path to a JSON file containing a library of compounds (see [below](#scree-file-format)). Leave empty to work with proteins only. |
-| `MAX_COMPOUND_ATOMS`           | Amount of atoms (including hydrogens) that compounds from `SCREEN_FILE` can have to be included in the screening. |
+| `MAX_COMPOUND_ATOMS`           | Amount of explicit atoms that compounds from `SCREEN_FILE` can have to be included in the screening. |
 | `CLUSTER_CONFIG`               | Path to your cluster configuration JSON file (see [below](#cluster-configuration)). |
 | `GPU_PROFILES`                 | Comma-separated list of GPU profiles from cluster configuration to use for job assignment (e.g., `"40g,80g"`). |
 | `DATAPIPELINE_STATISTICS_FILE` | CSV file where statistics from the **data pipeline** stage will be stored (default: `datapipeline_statistics.csv`). |
@@ -74,7 +74,7 @@ The behavior of the pipeline is controlled by the `MODE` parameter.
 > In `collapsed` mode, sequence names must be unique per dimension (they may repeat across dimensions). If multiple chains share the same name and you *have* to use `collapsed` mode, assign distinct identifiers (for example, append `_A`, `_B`, etc.) to ensure proper complex prediction. The same limitation exists in `cartesian` mode; however, duplicate sequences are inherently nonsensical for this configuration.
 
 ### Screen file format
-Compounds must be provided as a list of JSON objects. The keys `ID` and ``SMILES` must be present. More keys are allowed. The `ID` will be used to name files and directories. 
+Compounds must be provided as a list of JSON objects. The keys `ID` and `SMILES` must be present. More keys are allowed. The `ID` will be used to name files and directories. 
 
 ```json
 [
@@ -95,7 +95,7 @@ Compounds must be provided as a list of JSON objects. The keys `ID` and ``SMILES
     "Name": "Acetaminophen",
     "SMILES": "CC(=O)NC1=CC=C(C=C1)O",
     "CAS": "103-90-2"
-  },
+  }
 ]
 ```
 

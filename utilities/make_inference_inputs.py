@@ -5,8 +5,8 @@ import itertools
 import copy
 from rdkit import Chem
 
-def count_total_atoms(smiles):
-    """Count total atoms (including hydrogens) in SMILES using RDKit."""
+def count_explicit_atoms(smiles):
+    """Count total atoms (only explicit!) in SMILES using RDKit just like AlphaFold does it."""
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return float('inf')  # Invalid SMILES ? skip
@@ -45,7 +45,7 @@ def chain_id(idx: int) -> str:
 def load_valid_compounds(screen_file, max_atoms):
     valid_compounds = []
 
-    if not screen_data:
+    if not screen_file:
         return [None]
 
     try:
@@ -70,8 +70,8 @@ def load_valid_compounds(screen_file, max_atoms):
         if not smiles:
             continue
 
-        num_atoms = count_total_atoms(smiles)
-        if max_atoms and num_atoms > max_atoms:
+        num_atoms = count_explicit_atoms(smiles)
+        if max_atoms and num_atoms > int(max_atoms) > 0:
             continue
 
         valid_compounds.append({"ID": compound_id, "SMILES": smiles, "Atoms": num_atoms})
@@ -87,7 +87,9 @@ def main():
     SCREEN_FILE = os.environ.get("SCREEN_FILE", None)
     MAX_COMPOUND_ATOMS = os.environ.get("MAX_COMPOUND_ATOMS", None)
     PIPELINE_RUN_ID = os.environ["PIPELINE_RUN_ID"]
-    #make new variables
+    CLUSTER_CONFIG = os.environ["CLUSTER_CONFIG"]
+    GPU_PROFILES = os.environ.get("GPU_PROFILES", None)
+    # make new variables
     monomer_dir = "monomer_data"
     inference_jobs_dir = os.path.join("pending_jobs", PIPELINE_RUN_ID)
     too_big_file = "too_big.json"
@@ -95,11 +97,9 @@ def main():
     templates_dir = "templates"
 
     # Load cluster config
-    CLUSTER_CONFIG = os.environ["CLUSTER_CONFIG"]
     with open(CLUSTER_CONFIG, "r") as f:
         cluster_conf = json.load(f)
 
-    GPU_PROFILES = os.environ.get("GPU_PROFILES", "")
     if GPU_PROFILES:
         GPU_PROFILES = [p.strip() for p in GPU_PROFILES.split(",")]
     else:
@@ -204,24 +204,25 @@ def main():
         for compound in compound_list:
             ligand_atoms = 0
             ligand_name_id = ""
+            sequence_extension = []
             if compound:
                 ligand_chain_id = chain_id(len(sequences))
-                sequences.append({"ligand": {"id": ligand_chain_id, "smiles": compound["SMILES"]}})
+                sequence_extension = [{"ligand": {"id": ligand_chain_id, "smiles": compound["SMILES"]}}]
                 ligand_atoms = compound["Atoms"]
-                ligand_name_id = compound["ID"]
+                ligand_name_id = "_" + compound["ID"]
 
             job_name = "_".join(choice_tuple) + ligand_name_id
             job_data = {
                 "dialect": "alphafold3",
                 "version": 3,
                 "name": job_name,
-                "sequences": sequences,
+                "sequences": sequences + sequence_extension,
                 "modelSeeds": MODEL_SEEDS,
                 "bondedAtomPairs": None,
                 "userCCD": None
             }
 
-            token_size = sum(len(seq_obj["protein"]["sequence"]) for seq_obj in sequences) + ligand_atoms
+            token_size = sum(len(seq_obj["protein"]["sequence"]) for seq_obj in sequences if seq_obj.get("protein")) + ligand_atoms
 
             assigned = False
             for profile in GPU_PROFILES:
@@ -229,10 +230,10 @@ def main():
                     target_dir = os.path.join(inference_jobs_dir, profile)
                     os.makedirs(target_dir, exist_ok=True)
                     msas_link = os.path.join(target_dir, msas_dir)
-                    msas_target = os.path.join("..", "..", monomer_dir, msas_dir)
+                    msas_target = os.path.relpath(os.path.abspath(os.path.join(monomer_dir, msas_dir)), start=os.path.abspath(target_dir))
                     os.path.islink(msas_link) or os.symlink(msas_target, msas_link, target_is_directory=True)
                     templates_link = os.path.join(target_dir, templates_dir)
-                    templates_target = os.path.join("..", "..", monomer_dir, templates_dir)
+                    templates_target = os.path.relpath(os.path.abspath(os.path.join(monomer_dir, templates_dir)), start=os.path.abspath(target_dir))
                     os.path.islink(templates_link) or os.symlink(templates_target, templates_link, target_is_directory=True)
                     idx = profile_indices[profile]
                     job_file = os.path.join(target_dir, f"{idx}_{job_name}.json")

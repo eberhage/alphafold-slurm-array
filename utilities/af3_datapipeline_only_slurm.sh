@@ -14,9 +14,9 @@ DATA_PIPELINE_ID=$(( SLURM_ARRAY_TASK_ID + START_OFFSET ))
 scontrol update jobid=${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID} comment="Task $((DATA_PIPELINE_ID + 1)) of ${TOTAL_DATAPIPELINE_JOBS}"
 
 WORKDIR=$(pwd)
-user_input_file=$WORKDIR/data_pipeline_inputs/${DATA_PIPELINE_ID}_*.json
+user_input_file=$WORKDIR/data_pipeline_inputs/${PIPELINE_RUN_ID}/${DATA_PIPELINE_ID}_*.json
 AF3_input_file=$(basename $user_input_file)
-AF3_input_path=$WORKDIR/data_pipeline_inputs
+AF3_input_path=$WORKDIR/data_pipeline_inputs/${PIPELINE_RUN_ID}
 AF3_output_path=$WORKDIR/monomer_data
 export APPTAINER_TMPDIR=$WORKDIR/tmp/apptainer_${SLURM_ARRAY_JOB_ID}/${SLURM_ARRAY_TASK_ID}
 
