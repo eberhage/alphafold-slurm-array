@@ -36,17 +36,19 @@ Each dictionary defines one **dimension vector**, where every entry is a `"Prote
 ## Job Configuration
 The following parameters are set inside submit_data_pipeline.sh:
 
-| Variable                       | Description                                                                                                                                                                       |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `INPUT_FILE`                   | Path to the input JSON file (default: `input.json`).                                                                                                                              |
-| `MODE`                         | Job generation mode (see [below](#mode)):<ul><li>`cartesian`: full product between dimensions</li><li>`collapsed`: one job per dimension</li></ul>                                |
-| `SEEDS`                        | Comma-separated AlphaFold seeds used for inference.                                                                                                                               |
-| `RESULTS_PER_DIR`              | Number of results to bundle per directory. Naming scheme: `results/<SLURM_ARRAY_JOB_ID>_<GPU_PROFILE>_x-<x+RESULTS_PER_DIR-1>`.                                                                                     |
-| `SORTING`                      | How to order protein chains within a dimension:<br><ul><li>`alpha`: alphabetically by protein key</li><li>`input`: preserve order from `input.json`</li></ul>                     |
-| `CLUSTER_CONFIG`               | Path to your cluster configuration JSON file (see [below](#cluster-configuration)).                                                                                               |
-| `GPU_PROFILES`                 | Comma-separated list of GPU profiles from cluster configuration to use for job assignment (e.g., `"40g,80g"`).                                                                |
-| `DATAPIPELINE_STATISTICS_FILE` | CSV file where statistics from the **data pipeline** stage will be stored (default: `datapipeline_statistics.csv`).                                                               |
-| `INFERENCE_STATISTICS_FILE`    | CSV file where statistics from the **inference** stage will be stored (default: `inference_statistics.csv`).                                                                      |
+| Variable                       | Description |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `INPUT_FILE`                   | Path to the input JSON file (default: `input.json`). |
+| `MODE`                         | Job generation mode (see [below](#mode)):<ul><li>`cartesian`: full product between dimensions</li><li>`collapsed`: one job per dimension</li></ul> |
+| `SEEDS`                        | Comma-separated AlphaFold seeds used for inference. |
+| `RESULTS_PER_DIR`              | Number of results to bundle per directory. Naming scheme: `results/<SLURM_ARRAY_JOB_ID>_<GPU_PROFILE>_x-<x+RESULTS_PER_DIR-1>`. |
+| `SORTING`                      | How to order protein chains within a dimension:<br><ul><li>`alpha`: alphabetically by protein key</li><li>`input`: preserve order from `input.json`</li></ul> |
+| `SCREEN_FILE`                  | Path to a JSON file containing a library of compounds (see [below](#scree-file-format)). Leave empty to work with proteins only. |
+| `MAX_COMPOUND_ATOMS`           | Amount of atoms (including hydrogens) that compounds from `SCREEN_FILE` can have to be included in the screening. |
+| `CLUSTER_CONFIG`               | Path to your cluster configuration JSON file (see [below](#cluster-configuration)). |
+| `GPU_PROFILES`                 | Comma-separated list of GPU profiles from cluster configuration to use for job assignment (e.g., `"40g,80g"`). |
+| `DATAPIPELINE_STATISTICS_FILE` | CSV file where statistics from the **data pipeline** stage will be stored (default: `datapipeline_statistics.csv`). |
+| `INFERENCE_STATISTICS_FILE`    | CSV file where statistics from the **inference** stage will be stored (default: `inference_statistics.csv`). |
 | `POSTPROCESSING_SCRIPT`        | Optional script that runs after each inference job. It has access to environment variables such as `INFERENCE_NAME`, `INFERENCE_DIR`, and `INFERENCE_ID`. Leave empty to disable. |
 
 
@@ -70,6 +72,35 @@ The behavior of the pipeline is controlled by the `MODE` parameter.
 
 > [!WARNING]  
 > In `collapsed` mode, sequence names must be unique per dimension (they may repeat across dimensions). If multiple chains share the same name and you *have* to use `collapsed` mode, assign distinct identifiers (for example, append `_A`, `_B`, etc.) to ensure proper complex prediction. The same limitation exists in `cartesian` mode; however, duplicate sequences are inherently nonsensical for this configuration.
+
+### Screen file format
+Compounds must be provided as a list of JSON objects. The keys `ID` and ``SMILES` must be present. More keys are allowed. The `ID` will be used to name files and directories. 
+
+```json
+[
+  {
+    "ID": "ASS",
+    "Name": "Aspirin",
+    "SMILES": "CC(=O)OC1=CC=CC=C1C(=O)O",
+    "CAS": "50-78-2"
+  },
+  {
+    "ID": "IBU",
+    "Name": "Ibuprofen",
+    "SMILES": "CC(C)CC1=CC=C(C=C1)C(C)C(=O)O",
+    "CAS": "15687-27-1"
+  },
+  {
+    "ID": "PCM",
+    "Name": "Acetaminophen",
+    "SMILES": "CC(=O)NC1=CC=C(C=C1)O",
+    "CAS": "103-90-2"
+  },
+]
+```
+
+> [!WARNING]  
+> Compounds in CCD format are not yet supported.
 
 ## Cluster Configuration
 
@@ -105,20 +136,26 @@ The pipeline now uses a **cluster configuration JSON** to define paths, SLURM pa
 }
 ```
 
-| Field                    | Description                                                                                                                                                                                                                                                                                |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `af3_container_path`     | Path to the AlphaFold3 container file (`.sif`).                                                                                                                                                                                                                                            |
-| `af3_model_path`         | Path to the directory containing [AlphaFold3 model weights provided by Google-Deepmind](https://docs.google.com/forms/d/e/1FAIpQLSfWZAgo1aYk0O4MuAXZj8xRQ8DafeFJnldNOnh_13qAx2ceZw/viewform).                                                                                              |
-| `af3_db_path`            | Path to the AlphaFold3 databases directory.                                                                                                                                                                                                                                                |
-| `datapipeline_partition` | SLURM partition used for MSA/template search (CPU jobs).                                                                                                                                                                                                                                   |
-| `inference_partition`    | SLURM partition used for inference (GPU jobs).                                                                                                                                                                                                                                             |
-| `gpu_profiles`           | Dictionary of GPU profiles. Each profile defines: <ul><li>`gres`: GPU resource name in SLURM</li><li>`token_limit`: maximum number of tokens this profile can handle</li><li>`max_minutes_per_seed`: Limit of minutes to allocate per seed</li><li>`enable_xla`: default: `false`</li></ul>|
+| Field                    | Description |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------|
+| `af3_container_path`     | Path to the AlphaFold3 container file (`.sif`). |
+| `af3_model_path`         | Path to the directory containing [AlphaFold3 model weights provided by Google-Deepmind](https://docs.google.com/forms/d/e/1FAIpQLSfWZAgo1aYk0O4MuAXZj8xRQ8DafeFJnldNOnh_13qAx2ceZw/viewform). |
+| `af3_db_path`            | Path to the AlphaFold3 databases directory. |
+| `datapipeline_partition` | SLURM partition used for MSA/template search (CPU jobs). |
+| `inference_partition`    | SLURM partition used for inference (GPU jobs). |
+| `gpu_profiles`           | Dictionary of GPU profiles. Each profile defines: <ul><li>`gres`: GPU resource name in SLURM</li><li>`token_limit`: maximum number of tokens this profile can handle</li><li>`max_minutes_per_seed`: Limit of minutes to allocate per seed</li><li>`enable_xla`: default: `false`</li></ul> |
 
 ### Notes on GPU Profiles
 
 - Users may define **any number of GPU profiles**. Each profile must include a valid `gres`, `token_limit`, and `max_minutes_per_seed`.
 - The pipeline will automatically **assign jobs to the smallest possible GPU profile** that can handle the total tokens of the job.
 - Token limits allow the pipeline to efficiently distribute jobs across different GPU types.
+
+## Prerequisites
+
+The pipeline uses RDKit to read compound screen data. RDkit needs to be installed in your Python environment that Slurm uses (the base environment per default). Use your preferred means to get it.
+[RDKit on PyPi](https://pypi.org/project/rdkit/)
+[RDKit on Anaconda](https://anaconda.org/channels/conda-forge/packages/rdkit/overview)
 
 ## Output
 
@@ -162,4 +199,4 @@ These values are automatically collected into the statistics CSV file for downst
 - Prepare cluster configuration file.
 - Adjust configuration inside `submit_data_pipeline.sh`.
 - Submit the pipeline to your HPC cluster (SLURM).
-- Collect statistics from the generated CSV files.
+- Collect statistics from the generated statistics files.

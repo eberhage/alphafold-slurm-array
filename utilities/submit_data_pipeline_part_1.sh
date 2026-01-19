@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+export PIPELINE_RUN_ID="run-$(date +%Y%m%d-%H%M)"
+
 # Parse cluster settings
 export AF3_CONTAINER_PATH=$(jq -r '.af3_container_path' "$CLUSTER_CONFIG")
 export AF3_MODEL_PATH=$(jq -r '.af3_model_path' "$CLUSTER_CONFIG")
@@ -160,8 +162,8 @@ if [[ -n "${SCREEN_FILE:-}" ]]; then
     read total_compounds valid_compounds <<< "$output_screen"
 
     if [[ "$valid_compounds" =~ ^[1-9][0-9]*$ ]]; then
+        total_inference_jobs_without_compounds=$TOTAL_INFERENCE_JOBS
         TOTAL_INFERENCE_JOBS=$((TOTAL_INFERENCE_JOBS * valid_compounds))
-        echo "Found $valid_compounds valid compounds in the screen."
     else
         echo "WARNING: No valid compounds found in screen. The pipeline will continue without compound screening."
     fi
@@ -177,10 +179,12 @@ elif [[ "$MODE" == "collapsed" ]]; then
 fi
 
 echo
-echo "$TOTAL_DATAPIPELINE_JOBS unique sequence(s) found across $NUM_DIMENSIONS dimension(s)."
+echo "$TOTAL_DATAPIPELINE_JOBS unique protein sequence(s) found across $NUM_DIMENSIONS dimension(s)."
 echo
 if [[ -n "${SCREEN_FILE:-}" && "$valid_compounds" =~ ^[1-9][0-9]*$ ]]; then
-    echo "Multiplying with 1 extra dimension containing $valid_compounds compounds."
+    echo "This would be $total_inference_jobs_without_compounds inference jobs but you also provided a compound list."
+    echo "Found $valid_compounds valid compounds in the screen."
+    echo "Multiplying $total_inference_jobs_without_compounds inference jobs with 1 extra dimension containing $valid_compounds compounds."
     echo
 fi
 echo "Generating $TOTAL_INFERENCE_JOBS job(s) using mode: $MODE_DESC."

@@ -46,7 +46,7 @@ def load_valid_compounds(screen_file, max_atoms):
     valid_compounds = []
 
     if not screen_data:
-        return None
+        return [None]
 
     try:
         with open(screen_file, 'r') as f:
@@ -76,7 +76,7 @@ def load_valid_compounds(screen_file, max_atoms):
 
         valid_compounds.append({"ID": compound_id, "SMILES": smiles, "Atoms": num_atoms})
 
-    return valid_compounds
+    return valid_compounds if valid_compounds else [None]
 
 def main():
     # Read environment variables
@@ -86,9 +86,11 @@ def main():
     SORTING = os.environ.get("SORTING", "input")
     SCREEN_FILE = os.environ.get("SCREEN_FILE", None)
     MAX_COMPOUND_ATOMS = os.environ.get("MAX_COMPOUND_ATOMS", None)
+    PIPELINE_RUN_ID = os.environ["PIPELINE_RUN_ID"]
+    #make new variables
     monomer_dir = "monomer_data"
-    INFERENCE_JOBS_DIR = "pending_jobs"
-    TOO_BIG_FILE = "too_big.json"
+    inference_jobs_dir = os.path.join("pending_jobs", PIPELINE_RUN_ID)
+    too_big_file = "too_big.json"
     msas_dir = "msas"
     templates_dir = "templates"
 
@@ -181,8 +183,6 @@ def main():
     else:
         maxchains = 25
     
-
-########## proceed HEEERE
     for choice in iterator:
         choice_tuple = tuple(choice)
         canon = tuple(sorted(choice))
@@ -201,46 +201,55 @@ def main():
             seq_obj["protein"]["id"] = chain_id(pos)
             sequences.append(seq_obj)
 
-        job_name = "_".join(choice_tuple)
-        job_data = {
-            "dialect": "alphafold3",
-            "version": 3,
-            "name": job_name,
-            "sequences": sequences,
-            "modelSeeds": MODEL_SEEDS,
-            "bondedAtomPairs": None,
-            "userCCD": None
-        }
+        for compound in compound_list:
+            ligand_atoms = 0
+            ligand_name_id = ""
+            if compound:
+                ligand_chain_id = chain_id(len(sequences))
+                sequences.append({"ligand": {"id": ligand_chain_id, "smiles": compound["SMILES"]}})
+                ligand_atoms = compound["Atoms"]
+                ligand_name_id = compound["ID"]
 
-        token_size = sum(len(seq_obj["protein"]["sequence"]) for seq_obj in sequences)
+            job_name = "_".join(choice_tuple) + ligand_name_id
+            job_data = {
+                "dialect": "alphafold3",
+                "version": 3,
+                "name": job_name,
+                "sequences": sequences,
+                "modelSeeds": MODEL_SEEDS,
+                "bondedAtomPairs": None,
+                "userCCD": None
+            }
 
-        assigned = False
-        for profile in GPU_PROFILES:
-            if token_size <= profile_limits[profile]:
-                target_dir = os.path.join(INFERENCE_JOBS_DIR, profile)
-                os.makedirs(target_dir, exist_ok=True)
-                msas_link = os.path.join(target_dir, msas_dir)
-                msas_target = os.path.join("..", "..", monomer_dir, msas_dir)
-                os.path.islink(msas_link) or os.symlink(msas_target, msas_link, target_is_directory=True)
-                templates_link = os.path.join(target_dir, templates_dir)
-                templates_target = os.path.join("..", "..", monomer_dir, templates_dir)
-                os.path.islink(templates_link) or os.symlink(templates_target, templates_link, target_is_directory=True)
-                idx = profile_indices[profile]
-                job_file = os.path.join(target_dir, f"{idx}_{job_name}.json")
-                profile_indices[profile] += 1
-                dump_compact_lists(job_data, job_file)
-                print(f"Created {job_file} (token size {token_size})", file=sys.stderr)
-                assigned = True
-                break
+            token_size = sum(len(seq_obj["protein"]["sequence"]) for seq_obj in sequences) + ligand_atoms
 
-        if not assigned:
-            too_big_jobs.append({"name": job_name, "token_size": token_size})
+            assigned = False
+            for profile in GPU_PROFILES:
+                if token_size <= profile_limits[profile]:
+                    target_dir = os.path.join(inference_jobs_dir, profile)
+                    os.makedirs(target_dir, exist_ok=True)
+                    msas_link = os.path.join(target_dir, msas_dir)
+                    msas_target = os.path.join("..", "..", monomer_dir, msas_dir)
+                    os.path.islink(msas_link) or os.symlink(msas_target, msas_link, target_is_directory=True)
+                    templates_link = os.path.join(target_dir, templates_dir)
+                    templates_target = os.path.join("..", "..", monomer_dir, templates_dir)
+                    os.path.islink(templates_link) or os.symlink(templates_target, templates_link, target_is_directory=True)
+                    idx = profile_indices[profile]
+                    job_file = os.path.join(target_dir, f"{idx}_{job_name}.json")
+                    profile_indices[profile] += 1
+                    dump_compact_lists(job_data, job_file)
+                    print(f"Created {job_file} (token size {token_size})", file=sys.stderr)
+                    assigned = True
+                    break
+
+            if not assigned:
+                too_big_jobs.append({"name": job_name, "token_size": token_size})
 
     # Write too-big jobs list
     if too_big_jobs:
-        with open(TOO_BIG_FILE, "w") as f:
+        with open(too_big_file, "w") as f:
             json.dump(too_big_jobs, f, indent=2)
-        print(f"{len(too_big_jobs)} jobs too big -> written to {TOO_BIG_FILE}", file=sys.stderr)
+        print(f"{len(too_big_jobs)} jobs too big -> written to {too_big_file}", file=sys.stderr)
 
     # Final summary
     output = {

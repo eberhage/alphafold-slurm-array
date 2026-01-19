@@ -2,13 +2,14 @@ import os
 import json
 import sys
 
-OUTPUT_DIR = "data_pipeline_inputs"
-MONOMER_DIR = "monomer_data"
-input_file = os.environ["INPUT_FILE"]
+PIPELINE_RUN_ID = os.environ["PIPELINE_RUN_ID"]
+INPUT_FILE = os.environ["INPUT_FILE"]
+output_dir = os.path.join("data_pipeline_inputs", PIPELINE_RUN_ID)
+monomer_dir = "monomer_data"
 
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(output_dir, exist_ok=True)
 
-with open(input_file, "r") as f:
+with open(INPUT_FILE, "r") as f:
     dimensions = json.load(f)
 
 first_seen_sequences = {}
@@ -24,7 +25,7 @@ def check_existing_monomer_data(protein_name):
     Assumes that there is exactly one sequence entry in 'sequences'.
     Prints short messages to stderr for any missing or invalid items.
     """
-    monomer_file = os.path.join(MONOMER_DIR, f"{protein_name}_data.json")
+    monomer_file = os.path.join(monomer_dir, f"{protein_name}_data.json")
     if not os.path.exists(monomer_file):
         return False
 
@@ -107,7 +108,7 @@ for dim_idx, dimension in enumerate(dimensions):
                 "modelSeeds": [0]
             }
 
-            out_path = os.path.join(OUTPUT_DIR, f"{file_index}_{protein_name}.json")
+            out_path = os.path.join(output_dir, f"{file_index}_{protein_name}.json")
             with open(out_path, "w") as out_f:
                 json.dump(out_json, out_f, indent=4)
 
