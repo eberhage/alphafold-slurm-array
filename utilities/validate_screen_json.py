@@ -4,8 +4,8 @@ import os
 from rdkit import Chem
 
 
-def count_total_atoms(smiles):
-    """Count total atoms (including hydrogens) in SMILES using RDKit."""
+def count_explicit_atoms(smiles):
+    """Count total atoms (only explicit!) in SMILES using RDKit just like AlphaFold does it."""
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return float('inf')  # Invalid SMILES → skip
@@ -13,31 +13,19 @@ def count_total_atoms(smiles):
 
 
 def main():
-    # Check for exactly two positional arguments
-    if len(sys.argv) != 3:
-        print(f"Usage: {sys.argv[0]} <SCREEN_FILE> <MAX_COMPOUND_ATOMS>", file=sys.stderr)
-        sys.exit(1)
+    SCREEN_FILE = os.environ.get("SCREEN_FILE", None)
+    MAX_COMPOUND_ATOMS = os.environ.get("MAX_COMPOUND_ATOMS", None)
 
-    screen_file = sys.argv[1]
-    max_atoms_str = sys.argv[2]
-
-    # Validate MAX_COMPOUND_ATOMS
-    try:
-        max_atoms = int(max_atoms_str)
-    except ValueError:
-        print(f"Error: MAX_COMPOUND_ATOMS='{max_atoms_str}' is not a valid integer.", file=sys.stderr)
-        sys.exit(1)
-
-    # Read screen file
-    if not os.path.isfile(screen_file):
-        print(f"Error: SCREEN_FILE '{screen_file}' not found.", file=sys.stderr)
+    # Validate SCREEN_FILE exists
+    if not os.path.isfile(SCREEN_FILE):
+        print(f"Error: SCREEN_FILE '{SCREEN_FILE}' not found.", file=sys.stderr)
         sys.exit(1)
 
     try:
-        with open(screen_file, 'r') as f:
+        with open(SCREEN_FILE, 'r') as f:
             screen_data = json.load(f)
     except Exception as e:
-        print(f"Error: Failed to read SCREEN_FILE '{screen_file}': {e}", file=sys.stderr)
+        print(f"Error: Failed to read SCREEN_FILE '{SCREEN_FILE}': {e}", file=sys.stderr)
         sys.exit(1)
 
     # Validate it's a list
@@ -64,8 +52,10 @@ def main():
             continue
 
         # Count total atoms
-        num_atoms = count_total_atoms(smiles)
-        if num_atoms > max_atoms:
+        num_atoms = count_explicit_atoms(smiles)
+        
+        # Skip if exceeds MAX_COMPOUND_ATOMS (if limit is set)
+        if MAX_COMPOUND_ATOMS and num_atoms > int(MAX_COMPOUND_ATOMS):
             continue
 
         valid_compounds += 1

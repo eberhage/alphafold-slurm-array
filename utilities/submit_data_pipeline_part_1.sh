@@ -154,7 +154,7 @@ fi
 read TOTAL_DATAPIPELINE_JOBS TOTAL_INFERENCE_JOBS <<< "$output"
 
 if [[ -n "${SCREEN_FILE:-}" ]]; then
-    if ! output_screen=$(python3 utilities/validate_screen_json.py "$SCREEN_FILE" "$MAX_COMPOUND_ATOMS"); then
+    if ! output_screen=$(python3 utilities/validate_screen_json.py); then
         echo "Validation of screen file failed. Aborting."
         exit 1
     fi

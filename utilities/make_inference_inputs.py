@@ -224,26 +224,25 @@ def main():
 
             token_size = sum(len(seq_obj["protein"]["sequence"]) for seq_obj in sequences if seq_obj.get("protein")) + ligand_atoms
 
-            assigned = False
             for profile in GPU_PROFILES:
-                if token_size <= profile_limits[profile]:
-                    target_dir = os.path.join(inference_jobs_dir, profile)
-                    os.makedirs(target_dir, exist_ok=True)
-                    msas_link = os.path.join(target_dir, msas_dir)
-                    msas_target = os.path.relpath(os.path.abspath(os.path.join(monomer_dir, msas_dir)), start=os.path.abspath(target_dir))
-                    os.path.islink(msas_link) or os.symlink(msas_target, msas_link, target_is_directory=True)
-                    templates_link = os.path.join(target_dir, templates_dir)
-                    templates_target = os.path.relpath(os.path.abspath(os.path.join(monomer_dir, templates_dir)), start=os.path.abspath(target_dir))
-                    os.path.islink(templates_link) or os.symlink(templates_target, templates_link, target_is_directory=True)
-                    idx = profile_indices[profile]
-                    job_file = os.path.join(target_dir, f"{idx}_{job_name}.json")
-                    profile_indices[profile] += 1
-                    dump_compact_lists(job_data, job_file)
-                    print(f"Created {job_file} (token size {token_size})", file=sys.stderr)
-                    assigned = True
-                    break
+                if token_size > profile_limits[profile]:
+                    continue
 
-            if not assigned:
+                target_dir = os.path.join(inference_jobs_dir, profile)
+                os.makedirs(target_dir, exist_ok=True)
+                msas_link = os.path.join(target_dir, msas_dir)
+                msas_target = os.path.relpath(os.path.abspath(os.path.join(monomer_dir, msas_dir)), start=os.path.abspath(target_dir))
+                os.path.islink(msas_link) or os.symlink(msas_target, msas_link, target_is_directory=True)
+                templates_link = os.path.join(target_dir, templates_dir)
+                templates_target = os.path.relpath(os.path.abspath(os.path.join(monomer_dir, templates_dir)), start=os.path.abspath(target_dir))
+                os.path.islink(templates_link) or os.symlink(templates_target, templates_link, target_is_directory=True)
+                idx = profile_indices[profile]
+                job_file = os.path.join(target_dir, f"{idx}_{job_name}.json")
+                profile_indices[profile] += 1
+                dump_compact_lists(job_data, job_file)
+                print(f"Created {job_file} (token size {token_size})", file=sys.stderr)
+                break
+            else:
                 too_big_jobs.append({"name": job_name, "token_size": token_size})
 
     # Write too-big jobs list
