@@ -43,7 +43,7 @@ The following parameters are set inside submit_data_pipeline.sh:
 | `SEEDS`                        | Comma-separated AlphaFold seeds used for inference. |
 | `RESULTS_PER_DIR`              | Number of results to bundle per directory. Naming scheme: `results/<SLURM_ARRAY_JOB_ID>_<GPU_PROFILE>_x-<x+RESULTS_PER_DIR-1>`. |
 | `SORTING`                      | How to order protein chains within a dimension:<br><ul><li>`alpha`: alphabetically by protein key</li><li>`input`: preserve order from `input.json`</li></ul> |
-| `SCREEN_FILE`                  | Path to a JSON file containing a library of compounds (see [below](#scree-file-format)). Leave empty to work with proteins only. |
+| `SCREEN_FILE`                  | Path to a JSON file containing a library of compounds (see [below](#screen-file-format)). Leave empty to work with proteins only. |
 | `MAX_COMPOUND_ATOMS`           | Amount of explicit atoms that compounds from `SCREEN_FILE` can have to be included in the screening. |
 | `CLUSTER_CONFIG`               | Path to your cluster configuration JSON file (see [below](#cluster-configuration)). |
 | `GPU_PROFILES`                 | Comma-separated list of GPU profiles from cluster configuration to use for job assignment (e.g., `"40g,80g"`). |
