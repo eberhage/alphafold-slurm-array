@@ -199,6 +199,7 @@ def main():
             if "protein" not in seq_obj or not isinstance(seq_obj["protein"], dict):
                 raise ValueError(f"Invalid monomer JSON for protein '{protein}': missing or malformed 'protein' key.")
             seq_obj["protein"]["id"] = chain_id(pos)
+            seq_obj["protein"]["description"] = protein
             sequences.append(seq_obj)
 
         for compound in compound_list:
@@ -207,14 +208,14 @@ def main():
             sequence_extension = []
             if compound:
                 ligand_chain_id = chain_id(len(sequences))
-                sequence_extension = [{"ligand": {"id": ligand_chain_id, "smiles": compound["SMILES"]}}]
+                sequence_extension = [{"ligand": {"id": ligand_chain_id, "description": compound["ID"], "smiles": compound["SMILES"]}}]
                 ligand_atoms = compound["Atoms"]
                 ligand_name_id = "_" + compound["ID"]
 
             job_name = "_".join(choice_tuple) + ligand_name_id
             job_data = {
                 "dialect": "alphafold3",
-                "version": 3,
+                "version": 4,
                 "name": job_name,
                 "sequences": sequences + sequence_extension,
                 "modelSeeds": MODEL_SEEDS,
