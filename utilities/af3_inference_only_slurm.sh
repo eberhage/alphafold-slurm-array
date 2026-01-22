@@ -85,6 +85,8 @@ af_output=$(apptainer exec --writable-tmpfs --nv ${AF3_CONTAINER_PATH} python /a
     --jax_compilation_cache_dir=/root/jax_cache_dir \
 2>&1 | tee -a "slurm-output/slurm-${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}-${SLURM_JOB_NAME}.out")
 
+unset APPTAINER_BINDPATH
+
 if [[ -n "${INFERENCE_STATISTICS_FILE:-}" && -f "$INFERENCE_STATISTICS_FILE" ]]; then
     end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     read bucket_size tokens < <(echo "$af_output" | awk '/Got bucket size/ {

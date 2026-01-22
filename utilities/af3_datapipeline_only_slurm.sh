@@ -59,6 +59,8 @@ apptainer exec --writable-tmpfs --nv ${AF3_CONTAINER_PATH} python /app/alphafold
     --db_dir=/root/public_databases \
     --jackhmmer_n_cpu=$SLURM_CPUS_PER_TASK 
 
+unset APPTAINER_BINDPATH
+
 if [[ -n "${DATAPIPELINE_STATISTICS_FILE:-}" && -f "$DATAPIPELINE_STATISTICS_FILE" ]]; then
     end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     sequence_length=$(jq -r '.sequences[0].protein.sequence | length' "$AF3_input_path"/"$AF3_input_file")
