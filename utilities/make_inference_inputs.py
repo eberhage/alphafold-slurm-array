@@ -209,7 +209,7 @@ def main():
                 ligand_chain_id = chain_id(len(sequences))
                 sequence_extension = [{"ligand": {"id": ligand_chain_id, "smiles": compound["SMILES"]}}]
                 ligand_atoms = compound["Atoms"]
-                ligand_name_id = "_" + compound["ID"]
+                ligand_name_id = "_" + str(compound["ID"])
 
             job_name = "_".join(choice_tuple) + ligand_name_id
             job_data = {
