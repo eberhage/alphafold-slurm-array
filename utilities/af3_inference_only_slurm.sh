@@ -69,6 +69,8 @@ export APPTAINER_BINDPATH="/${AF3_input_path}:/root/af_input,${AF3_output_path}:
 
 # Extract the protein name from the JSON
 export INFERENCE_NAME=$(jq -r '.name' "$AF3_input_path"/"$AF3_input_file")
+# Only necessary as long as we dont have Version 4
+export COMPOUND_ID=$(python3 ./utilities/find_compound_id_from_smiles.py "$AF3_input_path"/"$AF3_input_file")
 export INFERENCE_DIR=${AF3_output_path}/${INFERENCE_NAME}
 
 echo "Running AlphaFold job for ${INFERENCE_NAME} (index ${SLURM_ARRAY_TASK_ID}, total-index: ${INFERENCE_ID})"
@@ -83,6 +85,8 @@ af_output=$(apptainer exec --writable-tmpfs --nv ${AF3_CONTAINER_PATH} python /a
     --jax_compilation_cache_dir=/root/jax_cache_dir \
 2>&1 | tee -a "slurm-output/slurm-${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}-${SLURM_JOB_NAME}.out")
 
+unset APPTAINER_BINDPATH
+
 if [[ -n "${INFERENCE_STATISTICS_FILE:-}" && -f "$INFERENCE_STATISTICS_FILE" ]]; then
     end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     read bucket_size tokens < <(echo "$af_output" | awk '/Got bucket size/ {
@@ -96,7 +100,8 @@ if [[ -n "${INFERENCE_STATISTICS_FILE:-}" && -f "$INFERENCE_STATISTICS_FILE" ]];
     jq -cn  --arg runid "$PIPELINE_RUN_ID" \
             --arg profile "$GPU_PROFILE" \
             --argjson a "$INFERENCE_ID" \
-        	--arg b "$INFERENCE_NAME" \
+            --arg b "$INFERENCE_NAME" \
+            --arg compoundid "$COMPOUND_ID" \
             --argjson c "$SLURM_ARRAY_JOB_ID" \
             --argjson d "$SLURM_ARRAY_TASK_ID" \
             --arg e "$(hostname)" \
@@ -105,7 +110,21 @@ if [[ -n "${INFERENCE_STATISTICS_FILE:-}" && -f "$INFERENCE_STATISTICS_FILE" ]];
             --arg h "$start_time" \
             --arg i "$end_time" \
             --argjson confidences "$confidences" \
-            '{"pipeline_run_id": $runid,"gpu_profile": $profile,"inference_id": $a, "name": $b, "array_job": $c, "array_task": $d, "hostname": $e, "tokens": $f, "bucket_size": $g, "start_time": $h, "end_time": $i, "af3_confidences": $confidences}' >> "$INFERENCE_STATISTICS_FILE"
+            '{
+                "pipeline_run_id": $runid,
+                "gpu_profile": $profile,
+                "inference_id": $a,
+                "name": $b,
+                "compound_id": (if $compoundid == "None" then null else $compoundid end),
+                "array_job": $c,
+                "array_task": $d,
+                "hostname": $e,
+                "tokens": $f,
+                "bucket_size": $g,
+                "start_time": $h,
+                "end_time": $i,
+                "af3_confidences": $confidences
+            }' >> "$INFERENCE_STATISTICS_FILE"
 fi
 
 rm -rf $AF3_cache_path
