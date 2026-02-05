@@ -6,17 +6,17 @@
   "inference_partition": "gpupartition",
   "gpu_profiles": {
     "40g": {
-      "gres": "a100-40g",
+      "gres": "gpu:a100-40g",
       "token_limit": 3072,
       "max_minutes_per_seed": 20
     },
     "80g": {
-      "gres": "a100-80g",
+      "gres": "gpu:a100-80g",
       "token_limit": 5120,
       "max_minutes_per_seed": 60
     },
     "80g-XLA": {
-      "gres": "a100-80g",
+      "gres": "gpu:a100-80g",
       "token_limit": 6144,
       "max_minutes_per_seed": 150,
       "enable_xla": true

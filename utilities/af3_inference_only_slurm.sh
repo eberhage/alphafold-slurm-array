@@ -40,7 +40,7 @@ if [[ "$SLURM_ARRAY_TASK_ID" -eq 0 ]]; then
         # Submit the next chunk
         sbatch --array=0-$(( next_end - next_start )) \
                --partition=${INFERENCE_PARTITION} \
-               --gres=gpu:${GPU_TYPE}:1 \
+               --gres=${GPU_TYPE}:1 \
                --time=${GPU_TIME} \
                --dependency=afterok:${SLURM_ARRAY_JOB_ID} \
                --export=ALL,START_OFFSET=$next_start \
@@ -94,7 +94,7 @@ if [[ -n "${INFERENCE_STATISTICS_FILE:-}" && -f "$INFERENCE_STATISTICS_FILE" ]];
         exit
     }')
 
-    confidences=$(python $WORKDIR/utilities/collect_af3_confidences.py "${INFERENCE_DIR}" "${INFERENCE_NAME}")
+    confidences=$(python3 $WORKDIR/utilities/collect_af3_confidences.py "${INFERENCE_DIR}" "${INFERENCE_NAME}")
 
     jq -cn  --arg runid "$PIPELINE_RUN_ID" \
             --arg profile "$GPU_PROFILE" \

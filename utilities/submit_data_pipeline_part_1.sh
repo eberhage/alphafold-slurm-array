@@ -98,7 +98,7 @@ check_gres_in_partition() {
 
 slurm_limit_exceeded() {
     max_time=$(scontrol show partition "$1" | awk 'match($0,/MaxTime=([^ ]+)/,a){print a[1]}')
-    [[ $max_time =~ infinite|UNLIMITED ]] && return 0
+    [[ $max_time =~ infinite|UNLIMITED ]] && return 1
     [[ $max_time == *-* ]] && days=${max_time%%-*} time_part=${max_time#*-} || days=0 time_part=$max_time
     IFS=: read hours minutes seconds <<<"$time_part"
     (( $2 > days*1440 + hours*60 + minutes ))

@@ -67,16 +67,19 @@ fi
 for profile in "${GPU_PROFILES_ARRAY[@]}"; do
     job_count=${JOB_COUNTS[$profile]:-0}
     gpu_type=$(jq -r --arg p "$profile" '.gpu_profiles[$p].gres' "$CLUSTER_CONFIG")
+    if [[ $gpu_type != gpu* ]]; then
+        gpu_type="gpu:$gpu_type"
+    fi
     enable_xla=$(jq -r --arg p "$profile" '.gpu_profiles[$p].enable_xla // false' "$CLUSTER_CONFIG")
     max_minutes=$(jq -r --arg p "$profile" '.gpu_profiles[$p].max_minutes_per_seed' "$CLUSTER_CONFIG")
     gpu_time=$(( max_minutes * num_seeds ))
 
     if [[ $job_count -gt 0 ]]; then
         first_chunk_size=$(( job_count < OUR_ARRAY_SIZE ? job_count : OUR_ARRAY_SIZE ))
-        echo "Submitting ${profile} inference jobs (0-$((first_chunk_size - 1))) with GPU '$gpu_type.'"
+        echo "Submitting ${profile} inference jobs (0-$((first_chunk_size - 1))) with GPU '$gpu_type'."
         sbatch --array=0-$(( first_chunk_size - 1 )) \
                --partition="${INFERENCE_PARTITION}" \
-               --gres=gpu:${gpu_type}:1 \
+               --gres=${gpu_type}:1 \
                --time=${gpu_time} \
                --export=ALL,TOTAL_INFERENCE_JOBS=$job_count,START_OFFSET=0,GPU_PROFILE=$profile,GPU_TYPE=$gpu_type,ENABLE_XLA=$enable_xla,GPU_TIME=$gpu_time \
                utilities/af3_inference_only_slurm.sh

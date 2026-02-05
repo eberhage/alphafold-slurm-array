@@ -51,9 +51,6 @@ The following parameters are set inside submit_data_pipeline.sh:
 | `INFERENCE_STATISTICS_FILE`    | CSV file where statistics from the **inference** stage will be stored (default: `inference_statistics.csv`). |
 | `POSTPROCESSING_SCRIPT`        | Optional script that runs after each inference job. It has access to environment variables such as `INFERENCE_NAME`, `INFERENCE_DIR`, and `INFERENCE_ID`. Leave empty to disable. |
 
-> [!WARNING]  
-> This pipeline relies on the AlphaFold3 input version 4. Make sure that your AlphaFold3 version is not older than 2025-09-02.
-
 ### Mode
 The behavior of the pipeline is controlled by the `MODE` parameter.
 - `cartesian`  
@@ -119,17 +116,17 @@ The pipeline now uses a **cluster configuration JSON** to define paths, SLURM pa
   "inference_partition": "gpupartition",
   "gpu_profiles": {
     "40g": {
-      "gres": "a100-40g",
+      "gres": "gpu:a100-40g",
       "token_limit": 3072,
       "max_minutes_per_seed": 20
     },
     "80g": {
-      "gres": "a100-80g",
+      "gres": "gpu:a100-80g",
       "token_limit": 5120,
       "max_minutes_per_seed": 60
     },
     "80g-XLA": {
-      "gres": "a100-80g",
+      "gres": "gpu:a100-80g",
       "token_limit": 6144,
       "max_minutes_per_seed": 150,
       "enable_xla": true
@@ -158,6 +155,9 @@ The pipeline now uses a **cluster configuration JSON** to define paths, SLURM pa
 The pipeline uses RDKit to read compound screen data. RDkit needs to be installed in your Python environment that Slurm uses (the base environment per default). Use your preferred means to get it.
 [RDKit on PyPi](https://pypi.org/project/rdkit/)
 [RDKit on Anaconda](https://anaconda.org/channels/conda-forge/packages/rdkit/overview)
+
+> [!WARNING]
+> This pipeline relies on the AlphaFold3 input version 4. Make sure that your AlphaFold3 version is not older than 2025-09-02.
 
 ## Output
 
