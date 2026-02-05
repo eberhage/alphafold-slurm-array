@@ -51,6 +51,8 @@ The following parameters are set inside submit_data_pipeline.sh:
 | `INFERENCE_STATISTICS_FILE`    | CSV file where statistics from the **inference** stage will be stored (default: `inference_statistics.csv`). |
 | `POSTPROCESSING_SCRIPT`        | Optional script that runs after each inference job. It has access to environment variables such as `INFERENCE_NAME`, `INFERENCE_DIR`, and `INFERENCE_ID`. Leave empty to disable. |
 
+> [!WARNING]  
+> This pipeline relies on the AlphaFold3 input version 4. Make sure that your AlphaFold3 version is not older than 2025-09-02.
 
 ### Mode
 The behavior of the pipeline is controlled by the `MODE` parameter.

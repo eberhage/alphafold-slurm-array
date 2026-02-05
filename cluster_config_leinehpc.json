@@ -1,5 +1,5 @@
 {
-  "af3_container_path": "/leinesw/software/user/alphafold3/container/alphafold3.1.sif",
+  "af3_container_path": "/leinesw/software/user/alphafold3/container/alphafold3.0.1-2026-02-04.sif",
   "af3_model_path": "/leinesw/software/user/alphafold3/model",
   "af3_db_path": "/leinesw/software/user/alphafold3/db",
   "datapipeline_partition": "leinecpu_lowprio",

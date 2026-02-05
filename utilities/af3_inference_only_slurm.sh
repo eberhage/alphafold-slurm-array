@@ -67,10 +67,9 @@ else
 fi
 export APPTAINER_BINDPATH="/${AF3_input_path}:/root/af_input,${AF3_output_path}:/root/af_output,${AF3_MODEL_PATH}:/root/models,${AF3_DB_PATH}:/root/public_databases,${AF3_cache_path}:/root/jax_cache_dir"
 
-# Extract the protein name from the JSON
+# Extract the protein name  and compound id from the JSON
 export INFERENCE_NAME=$(jq -r '.name' "$AF3_input_path"/"$AF3_input_file")
-# Only necessary as long as we dont have Version 4
-export COMPOUND_ID=$(python3 ./utilities/find_compound_id_from_smiles.py "$AF3_input_path"/"$AF3_input_file")
+export COMPOUND_ID=$(jq -r '.sequences[-1].ligand?.description' "$AF3_input_path/$AF3_input_file")
 export INFERENCE_DIR=${AF3_output_path}/${INFERENCE_NAME}
 
 echo "Running AlphaFold job for ${INFERENCE_NAME} (index ${SLURM_ARRAY_TASK_ID}, total-index: ${INFERENCE_ID})"
@@ -115,7 +114,7 @@ if [[ -n "${INFERENCE_STATISTICS_FILE:-}" && -f "$INFERENCE_STATISTICS_FILE" ]];
                 "gpu_profile": $profile,
                 "inference_id": $a,
                 "name": $b,
-                "compound_id": (if $compoundid == "None" then null else $compoundid end),
+                "compound_id": (if $compoundid == "null" then null else $compoundid end),
                 "array_job": $c,
                 "array_task": $d,
                 "hostname": $e,

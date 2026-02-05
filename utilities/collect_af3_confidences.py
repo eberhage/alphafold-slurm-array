@@ -37,4 +37,5 @@ for json_file in Path(sys.argv[1]).glob(pattern):
     except Exception as e:
         print(f"Warning: Could not read {json_file}: {e}", file=sys.stderr)
 
+confidences = dict(sorted(confidences.items()))
 print(json.dumps(confidences))
