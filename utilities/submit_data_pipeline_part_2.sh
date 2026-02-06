@@ -67,6 +67,7 @@ fi
 for profile in "${GPU_PROFILES_ARRAY[@]}"; do
     job_count=${JOB_COUNTS[$profile]:-0}
     gpu_type=$(jq -r --arg p "$profile" '.gpu_profiles[$p].gres' "$CLUSTER_CONFIG")
+    gpu_type=${gpu_type%%:+([0-9])} # removing hardcoded amount of gpus because we can only utilize 1
     if [[ $gpu_type != gpu* ]]; then
         gpu_type="gpu:$gpu_type"
     fi
