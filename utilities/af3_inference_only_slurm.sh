@@ -95,7 +95,8 @@ if [[ -n "${INFERENCE_STATISTICS_FILE:-}" && -f "$INFERENCE_STATISTICS_FILE" ]];
 
     confidences=$(python3 $WORKDIR/utilities/collect_af3_confidences.py "${INFERENCE_DIR}" "${INFERENCE_NAME}")
 
-    jq -cn  --arg runid "$PIPELINE_RUN_ID" \
+    log_object=$(jq -cn \
+            --arg runid "$PIPELINE_RUN_ID" \
             --arg profile "$GPU_PROFILE" \
             --arg a "$INFERENCE_ID" \
             --arg b "$INFERENCE_NAME" \
@@ -122,7 +123,11 @@ if [[ -n "${INFERENCE_STATISTICS_FILE:-}" && -f "$INFERENCE_STATISTICS_FILE" ]];
                 "start_time": $h,
                 "end_time": $i,
                 "af3_confidences": $confidences
-            }' >> "$INFERENCE_STATISTICS_FILE"
+            }')
+    (
+        flock -x -w 30 200 || exit 1
+        printf '%s\n' "$log_object" >> "$INFERENCE_STATISTICS_FILE"
+    ) 200>"$INFERENCE_STATISTICS_FILE.lock"
 fi
 
 rm -rf $AF3_cache_path
