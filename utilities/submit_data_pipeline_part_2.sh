@@ -82,6 +82,7 @@ for profile in "${GPU_PROFILES_ARRAY[@]}"; do
                --partition="${INFERENCE_PARTITION}" \
                --gres=${gpu_type}:1 \
                --time=${gpu_time} \
+               --ntasks=1 \
                --export=ALL,TOTAL_INFERENCE_JOBS=$job_count,START_OFFSET=0,GPU_PROFILE=$profile,GPU_TYPE=$gpu_type,ENABLE_XLA=$enable_xla,GPU_TIME=$gpu_time \
                utilities/af3_inference_only_slurm.sh
     else
