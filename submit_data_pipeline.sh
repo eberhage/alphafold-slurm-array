@@ -23,7 +23,7 @@ export MAX_COMPOUND_ATOMS=50
 export CLUSTER_CONFIG="cluster_config.json"
 
 # Choose which GPU profiles from cluster config to use
-export GPU_PROFILES="40g,80g"
+export GPU_PROFILES="40g-parallel,80g"
 
 # Datapipeline (MSA, template search) statistics file (simple CSV)
 export DATAPIPELINE_STATISTICS_FILE="datapipeline_statistics.csv"

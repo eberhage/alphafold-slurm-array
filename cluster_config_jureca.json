@@ -1,0 +1,22 @@
+{
+  "af3_container_path": "/p/data1/cng/AlphaFold3/alphafold3_22b9ab80.sif",
+  "af3_model_path": "/p/data1/cng/AlphaFold3/AF3_weights",
+  "af3_db_path": "/p/data1/cng/AlphaFold3/AF3_DBs",
+  "datapipeline_partition": "dc-cpu",
+  "inference_partition": "dc-gpu",
+  "gpu_profiles": {
+    "40g": {
+      "gres": "gpu",
+      "token_limit": 3072,
+      "max_minutes_per_seed": 20,
+      "parallel_tasks": 4
+    },
+    "40g-XLA": {
+      "gres": "gpu",
+      "token_limit": 5120,
+      "max_minutes_per_seed": 150,
+      "enable_xla": true,
+      "parallel_tasks": 4
+    }
+  }
+}

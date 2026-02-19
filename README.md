@@ -103,7 +103,7 @@ Compounds must be provided as a list of JSON objects. The keys `ID` and `SMILES`
 
 ## Cluster Configuration
 
-The pipeline now uses a **cluster configuration JSON** to define paths, SLURM partitions, and GPU profiles. This centralizes settings that are unlikely to change frequently.  
+The pipeline now uses a **cluster configuration JSON** to define paths, SLURM partitions, and GPU profiles. This centralizes settings that are unlikely to change frequently.
 
 ### Example
 
@@ -119,6 +119,12 @@ The pipeline now uses a **cluster configuration JSON** to define paths, SLURM pa
       "gres": "gpu:a100-40g",
       "token_limit": 3072,
       "max_minutes_per_seed": 20
+    },
+    "40g-parallel": {
+      "gres": "gpu:a100-40g",
+      "token_limit": 3072,
+      "max_minutes_per_seed": 20,
+      "parallel_tasks": 4
     },
     "80g": {
       "gres": "gpu:a100-80g",
@@ -142,13 +148,14 @@ The pipeline now uses a **cluster configuration JSON** to define paths, SLURM pa
 | `af3_db_path`            | Path to the AlphaFold3 databases directory. |
 | `datapipeline_partition` | SLURM partition used for MSA/template search (CPU jobs). |
 | `inference_partition`    | SLURM partition used for inference (GPU jobs). |
-| `gpu_profiles`           | Dictionary of GPU profiles. Each profile defines: <ul><li>`gres`: GPU resource name in SLURM</li><li>`token_limit`: maximum number of tokens this profile can handle</li><li>`max_minutes_per_seed`: Limit of minutes to allocate per seed</li><li>`enable_xla`: default: `false`</li></ul> |
+| `gpu_profiles`           | Dictionary of GPU profiles. Each profile defines: <ul><li>`gres`: GPU resource name in SLURM</li><li>`token_limit`: maximum number of tokens this profile can handle</li><li>`max_minutes_per_seed`: Limit of minutes to allocate per seed</li><li>`enable_xla`: default: `false`</li><li>`parallel_tasks`: default: `1`</li></ul> |
 
 ### Notes on GPU Profiles
 
 - Users may define **any number of GPU profiles**. Each profile must include a valid `gres`, `token_limit`, and `max_minutes_per_seed`.
 - The pipeline will automatically **assign jobs to the smallest possible GPU profile** that can handle the total tokens of the job.
 - Token limits allow the pipeline to efficiently distribute jobs across different GPU types.
+- The parameter `parallel_tasks` (>1) can be used for nodes that have multiple GPUs. Warning: This will tell slurm that you request a node with at least `parallel_tasks` many GPUs on `inference_partition`. On clusters with heterogeneous node configuration or when shared nodes are a available, this might lead to longer wait times than `parallel_tasks: 1`. However, when used correctly, it will greatly increase efficiency on clusters with exclusive node allocation.
 
 ## Prerequisites
 
@@ -165,7 +172,7 @@ The AlphaFold jobs are sorted into a result directory with the following structu
 
 ```bash
 results/
- ├── <SLURM_ARRAY_JOB_ID>_<GPU_PROFILE>_0-249/
+ ├── <RUN_ID>_<GPU_PROFILE>_0-249/
  │    ├── <inference_job_name>/
  │    │    ├── seed-0_sample-0/
  │    │    │    ├── <inference_job_name>_seed-0_sample-0_confidences.json
@@ -181,7 +188,7 @@ results/
  │    │    └── <inference_job_name>_summary_confidences.json
  │    ├── ...
  │   ...
- ├── <SLURM_ARRAY_JOB_ID>_250-499/
+ ├── <RUN_ID>_<GPU_PROFILE>_250-499/
  │    ├── ...
  │   ...
 ...

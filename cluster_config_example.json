@@ -10,6 +10,12 @@
       "token_limit": 3072,
       "max_minutes_per_seed": 20
     },
+    "40g-parallel": {
+      "gres": "gpu:a100-40g",
+      "token_limit": 3072,
+      "max_minutes_per_seed": 20,
+      "parallel_tasks": 4
+    },
     "80g": {
       "gres": "gpu:a100-80g",
       "token_limit": 5120,
