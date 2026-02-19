@@ -86,15 +86,39 @@ check_gres_in_partition() {
     local partition=$1
     local gres=$2
     local profile=$3
-    # Get list of GRES in the partition
-    local available_gres
-    available_gres=$(sinfo -h -o "%G" -p "$partition" | tr ',' '\n' | sort -u)
-
-    if ! echo "$available_gres" | grep -q -w "$gres"; then
-        echo "Error: GRES '$gres' for GPU profile '$profile' is not available in partition '$partition'" >&2
-        exit 1
+    local parallel_tasks=$4
+    local nodes_gres=$(sinfo -h -o "%G" -p "$partition")
+    if [[ -z "$nodes_gres" ]]; then
+        echo "Error: No nodes found in partition '$partition'" >&2
+        return 1
     fi
+
+    # Check if requested GRES exists anywhere
+    if ! echo "$nodes_gres" | tr ',' '\n' | sort -u | grep -qw "$gres"; then
+        echo "Error: GRES '$gres' for GPU profile '$profile' is not available in partition '$partition'" >&2
+        return 1
+    fi
+
+    # Check if at least one node has enough GPUs
+    while read -r node; do
+        # Split GRES list by comma
+        IFS=',' read -ra gres_list <<< "$node"
+        for g in "${gres_list[@]}"; do
+            # Check if this matches requested GRES
+            if [[ $g == $gres:* ]]; then
+                # Extract GPU count (after last colon)
+                gpu_count=${g##*:}
+                if (( gpu_count >= parallel_tasks )); then
+                    return 0
+                fi
+            fi
+        done
+    done <<< "$nodes_gres"
+
+    echo "Error: No node in partition '$partition' has the requested $parallel_tasks GPUs for profile '$profile' with GRES '$gres'" >&2
+    return 1
 }
+
 
 slurm_limit_exceeded() {
     max_time=$(scontrol show partition "$1" | awk 'match($0,/MaxTime=([^ ]+)/,a){print a[1]}')
@@ -118,6 +142,7 @@ for profile in "${GPU_PROFILES_ARRAY[@]}"; do
     gpu_gres=$(jq -r --arg p "$profile" '.gpu_profiles[$p].gres' "$CLUSTER_CONFIG")
     token_limit=$(jq -r --arg p "$profile" '.gpu_profiles[$p].token_limit' "$CLUSTER_CONFIG")
     max_minutes=$(jq -r --arg p "$profile" '.gpu_profiles[$p].max_minutes_per_seed' "$CLUSTER_CONFIG")
+    parallel_tasks=$(jq -r --arg p "$profile" '.gpu_profiles[$p].parallel_tasks // 1' "$CLUSTER_CONFIG")
 
     # Validate token_limit
     if ! [[ "$token_limit" =~ ^[1-9][0-9]*$ ]]; then
@@ -137,7 +162,7 @@ for profile in "${GPU_PROFILES_ARRAY[@]}"; do
     fi
 
     # Check if gres exists in partition
-    check_gres_in_partition "$INFERENCE_PARTITION" "$gpu_gres" "$profile"
+    check_gres_in_partition "$INFERENCE_PARTITION" "$gpu_gres" "$profile" "$parallel_tasks"
 done
 
 #########################################################################################################################
@@ -212,7 +237,25 @@ case "$answer" in
         ;;
 esac
 
-export MAX_ARRAY_SIZE=$(scontrol show config | awk -F= '/MaxArraySize/ {gsub(/ /,"",$2); print $2}')
+MAX_ARRAY_SIZE_RAW=$(scontrol show config | awk -F= '/MaxArraySize/ {gsub(/ /,"",$2); print $2}')
+MAX_JOB_COUNT=$(scontrol show config | awk -F= '/MaxJobCount/ {gsub(/ /,"",$2); print $2}')
+
+# Validate values are integers
+if ! [[ "$MAX_ARRAY_SIZE_RAW" =~ ^[0-9]+$ && "$MAX_JOB_COUNT" =~ ^[0-9]+$ ]]; then
+    echo "Error: Could not determine MaxArraySize or MaxJobCount from Slurm config." >&2
+    exit 1
+fi
+
+# Compute 10% of MaxJobCount (integer floor)
+MAX_ARRAY_CAP=$(( MAX_JOB_COUNT / 10 ))
+
+# Choose the smaller value
+if (( MAX_ARRAY_SIZE_RAW < MAX_ARRAY_CAP )); then
+    export MAX_ARRAY_SIZE=$MAX_ARRAY_SIZE_RAW
+else
+    export MAX_ARRAY_SIZE=$MAX_ARRAY_CAP
+fi
+
 export OUR_ARRAY_SIZE=$(( (MAX_ARRAY_SIZE / RESULTS_PER_DIR) * RESULTS_PER_DIR ))
 
 if (( OUR_ARRAY_SIZE == 0 )); then

@@ -1,6 +1,25 @@
 #!/bin/bash
+echo "Job ran on:" $(hostname)
 
 WORKDIR=$(pwd)
+
+export INFERENCE_ID=$(( FIRST_INFERENCE_ID + SLURM_PROCID ))
+
+# Compute last theoretical inference ID covered by this array chunk
+last_inference_id=$(( START_OFFSET + PARALLEL_TASKS * (SLURM_ARRAY_TASK_MAX + 1) - 1 ))
+
+# Clamp to total job count
+global_last_id=$(( TOTAL_INFERENCE_JOBS - 1 ))
+if (( last_inference_id > global_last_id )); then
+    last_inference_id=$global_last_id
+fi
+
+# Compute start and end of the bucket
+bucket_start=$(( (INFERENCE_ID / RESULTS_PER_DIR) * RESULTS_PER_DIR ))
+bucket_end=$(( bucket_start + RESULTS_PER_DIR - 1 ))
+if (( bucket_end > last_inference_id )); then
+    bucket_end=$last_inference_id
+fi
 
 user_input_file=$WORKDIR/pending_jobs/${PIPELINE_RUN_ID}/${GPU_PROFILE}/${INFERENCE_ID}_*.json
 AF3_input_file=$(basename $user_input_file)
@@ -40,7 +59,7 @@ af_output=$(apptainer exec --writable-tmpfs --nv ${AF3_CONTAINER_PATH} python /a
     --model_dir=/root/models \
     --output_dir=/root/af_output \
     --jax_compilation_cache_dir=/root/jax_cache_dir \
-2>&1 | tee -a "slurm-output/slurm-${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}-${SLURM_JOB_NAME}.out")
+2>&1 | tee -a "slurm-output/slurm-${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}_${SLURM_PROCID}-${SLURM_JOB_NAME}.out")
 
 unset APPTAINER_BINDPATH
 
@@ -97,7 +116,7 @@ rm -rf $AF3_input_path
 
 # --- Postprocessing ---
 if [[ -n "${POSTPROCESSING_SCRIPT:-}" && -f "$POSTPROCESSING_SCRIPT" ]]; then
-    sbatch --output="slurm-output/slurm-${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}-${SLURM_JOB_NAME}.out" \
+    sbatch --output="slurm-output/slurm-${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}_${SLURM_PROCID}-${SLURM_JOB_NAME}.out" \
            --open-mode=append \
            ${POSTPROCESSING_SCRIPT}
 fi
