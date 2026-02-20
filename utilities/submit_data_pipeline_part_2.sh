@@ -67,14 +67,24 @@ fi
 for profile in "${GPU_PROFILES_ARRAY[@]}"; do
     job_count=${JOB_COUNTS[$profile]:-0}
     gpu_type=$(jq -r --arg p "$profile" '.gpu_profiles[$p].gres' "$CLUSTER_CONFIG")
-    gpu_type=${gpu_type%%:+([0-9])} # removing hardcoded amount of gpus
-    if [[ $gpu_type != gpu* ]]; then
-        gpu_type="gpu:$gpu_type"
-    fi
+    normalized=${gpu_type#gpu:}
     enable_xla=$(jq -r --arg p "$profile" '.gpu_profiles[$p].enable_xla // false' "$CLUSTER_CONFIG")
     max_minutes=$(jq -r --arg p "$profile" '.gpu_profiles[$p].max_minutes_per_seed' "$CLUSTER_CONFIG")
     gpu_time=$(( max_minutes * num_seeds ))
     parallel_tasks=$(jq -r --arg p "$profile" '.gpu_profiles[$p].parallel_tasks // 1' "$CLUSTER_CONFIG")
+
+    if [[ "$normalized" == "gpu" || "$normalized" == 1 ]]; then
+        gpus_per_task=1
+	gres="gpu:$parallel_tasks"
+    else
+        if [[ "$normalized" =~ :[0-9]+$ ]]; then
+            gpus_per_task="${normalized%:*}:1"
+	    gres="gpu:${normalized%:*}:${parallel_tasks}"
+        else
+            gpus_per_task="${normalized}:1"
+	    gres="gpu:${normalized}:${parallel_tasks}"
+        fi
+    fi
 
     if (( job_count > 0 )); then
         # Adjust job count by parallel_tasks (round up)
@@ -83,13 +93,14 @@ for profile in "${GPU_PROFILES_ARRAY[@]}"; do
             echo "Note: Reducing job count from $job_count to $adjusted_job_count due to parallel_tasks=$parallel_tasks."
         fi
         first_chunk_size=$(( adjusted_job_count < OUR_ARRAY_SIZE ? adjusted_job_count : OUR_ARRAY_SIZE ))
-        echo "Submitting ${profile} inference jobs (0-$((first_chunk_size - 1))) with GPU '$gpu_type' and parallel_tasks=$parallel_tasks."
+        echo "Submitting ${profile} inference jobs (0-$((first_chunk_size - 1))) with gres=$gres, gpus_per_task=$gpus_per_task and parallel_tasks=$parallel_tasks."
         sbatch --array=0-$(( first_chunk_size - 1 )) \
                --partition="${INFERENCE_PARTITION}" \
-               --gres=${gpu_type}:${parallel_tasks}  \
+	       --gres=${gres} \
+               --gpus-per-task=${gpus_per_task} \
                --time=${gpu_time} \
                --ntasks=${parallel_tasks} \
-               --export=ALL,TOTAL_INFERENCE_JOBS=$job_count,START_OFFSET=0,GPU_PROFILE=$profile,GPU_TYPE=$gpu_type,ENABLE_XLA=$enable_xla,GPU_TIME=$gpu_time,PARALLEL_TASKS=$parallel_tasks \
+               --export=ALL,TOTAL_INFERENCE_JOBS=$job_count,START_OFFSET=0,GRES=$gres,GPU_PROFILE=$profile,GPUS_PER_TASK=$gpus_per_task,ENABLE_XLA=$enable_xla,GPU_TIME=$gpu_time,PARALLEL_TASKS=$parallel_tasks \
                utilities/af3_inference_only_slurm.sh
     else
         echo "No jobs to submit for GPU profile '$profile'."

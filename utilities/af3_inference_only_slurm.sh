@@ -1,7 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=AF3_inference
 #SBATCH --cpus-per-task=8
-#SBATCH --gpus-per-task=1
 #SBATCH --threads-per-core=1                    # Disable Multithreading
 #SBATCH --hint=nomultithread
 #SBATCH --output=slurm-output/slurm-%A_%a_0-%x.out # %j (Job ID) %x (Job Name)
@@ -37,7 +36,8 @@ if [[ "$SLURM_ARRAY_TASK_ID" -eq 0 ]]; then
 
         sbatch --array=0-$(( next_array_size - 1 )) \
                --partition=${INFERENCE_PARTITION} \
-               --gres=${GPU_TYPE}:${PARALLEL_TASKS} \
+	       --gres=${GRES} \
+               --gpus-per-task=${GPUS_PER_TASK} \
                --time=${GPU_TIME} \
                --ntasks=${PARALLEL_TASKS} \
                --dependency=afterok:${SLURM_ARRAY_JOB_ID} \
