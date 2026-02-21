@@ -51,5 +51,6 @@ fi
 srun --ntasks=$(( last_inference_id - first_inference_id + 1 )) \
      --export=ALL,FIRST_INFERENCE_ID=${first_inference_id} \
      --output=slurm-output/slurm-%A_%a_%t-%x.out \
+     --open-mode=append \
      $WORKDIR/utilities/af3_inference_task.sh
 
