@@ -33,6 +33,7 @@ if [[ "$SLURM_ARRAY_TASK_ID" -eq 0 ]]; then
                $WORKDIR/utilities/af3_datapipeline_only_slurm.sh
     else
         echo "All datapipeline batches done. Continuing with pair-building and inference..."
+        unset SLURM_MEM_PER_NODE
         sbatch --dependency=afterok:${SLURM_ARRAY_JOB_ID} \
                $WORKDIR/utilities/submit_data_pipeline_part_2.sh
     fi

@@ -75,14 +75,14 @@ for profile in "${GPU_PROFILES_ARRAY[@]}"; do
 
     if [[ "$normalized" == "gpu" || "$normalized" == 1 ]]; then
         gpus_per_task=1
-	gres="gpu:$parallel_tasks"
+        gres="gpu:$parallel_tasks"
     else
         if [[ "$normalized" =~ :[0-9]+$ ]]; then
             gpus_per_task="${normalized%:*}:1"
-	    gres="gpu:${normalized%:*}:${parallel_tasks}"
+            gres="gpu:${normalized%:*}:${parallel_tasks}"
         else
             gpus_per_task="${normalized}:1"
-	    gres="gpu:${normalized}:${parallel_tasks}"
+            gres="gpu:${normalized}:${parallel_tasks}"
         fi
     fi
 
@@ -96,7 +96,7 @@ for profile in "${GPU_PROFILES_ARRAY[@]}"; do
         echo "Submitting ${profile} inference jobs (0-$((first_chunk_size - 1))) with gres=$gres, gpus_per_task=$gpus_per_task and parallel_tasks=$parallel_tasks."
         sbatch --array=0-$(( first_chunk_size - 1 )) \
                --partition="${INFERENCE_PARTITION}" \
-	       --gres=${gres} \
+               --gres=${gres} \
                --gpus-per-task=${gpus_per_task} \
                --time=${gpu_time} \
                --ntasks=${parallel_tasks} \

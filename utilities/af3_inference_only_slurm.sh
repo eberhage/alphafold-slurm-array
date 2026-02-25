@@ -36,7 +36,7 @@ if [[ "$SLURM_ARRAY_TASK_ID" -eq 0 ]]; then
 
         sbatch --array=0-$(( next_array_size - 1 )) \
                --partition=${INFERENCE_PARTITION} \
-	       --gres=${GRES} \
+               --gres=${GRES} \
                --gpus-per-task=${GPUS_PER_TASK} \
                --time=${GPU_TIME} \
                --ntasks=${PARALLEL_TASKS} \
