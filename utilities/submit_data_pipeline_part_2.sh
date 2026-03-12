@@ -59,10 +59,6 @@ num_seeds=${#seed_array[@]}
 # Phase 2: Submit inference jobs
 # ------------------------------
 
-if [[ -n "${INFERENCE_STATISTICS_FILE:-}" && ! -f "$INFERENCE_STATISTICS_FILE" ]]; then
-    touch $INFERENCE_STATISTICS_FILE
-fi
-
 # Loop over all selected GPU profiles
 for profile in "${GPU_PROFILES_ARRAY[@]}"; do
     job_count=${JOB_COUNTS[$profile]:-0}

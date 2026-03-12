@@ -63,7 +63,7 @@ af_output=$(apptainer exec --writable-tmpfs --nv ${AF3_CONTAINER_PATH} python /a
 
 unset APPTAINER_BINDPATH
 
-if [[ -n "${INFERENCE_STATISTICS_FILE:-}" && -f "$INFERENCE_STATISTICS_FILE" ]]; then
+if [[ -n "${INFERENCE_STATISTICS_FILE:-}" ]]; then
     end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     read bucket_size tokens < <(echo "$af_output" | awk '/Got bucket size/ {
         match($0, /Got bucket size ([0-9]+) for input with ([0-9]+)/, a);
@@ -104,6 +104,9 @@ if [[ -n "${INFERENCE_STATISTICS_FILE:-}" && -f "$INFERENCE_STATISTICS_FILE" ]];
                 "end_time": $i,
                 "af3_confidences": $confidences
             }')
+
+    mkdir -p "$(dirname "$INFERENCE_STATISTICS_FILE")"
+
     (
         flock -x -w 30 200 || exit 1
         printf '%s\n' "$log_object" >> "$INFERENCE_STATISTICS_FILE"

@@ -283,6 +283,7 @@ fi
 
 if (( TOTAL_DATAPIPELINE_JOBS > 0 )); then
     if [[ -n "${DATAPIPELINE_STATISTICS_FILE:-}" && ! -f "$DATAPIPELINE_STATISTICS_FILE" ]]; then
+        mkdir -p "$(dirname "$DATAPIPELINE_STATISTICS_FILE")"
         echo "pipeline_run_id,datapipeline_id,datapipeline_name,job_id,task_id,node,sequence_length,start_time,end_time" > "$DATAPIPELINE_STATISTICS_FILE"
     fi
 
