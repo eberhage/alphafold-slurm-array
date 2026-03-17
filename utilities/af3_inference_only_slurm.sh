@@ -26,7 +26,9 @@ scontrol update jobid=${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID} comment="Task
 if [[ "$SLURM_ARRAY_TASK_ID" -eq 0 ]]; then
     next_start=$(( START_OFFSET + PARALLEL_TASKS * SLURM_ARRAY_TASK_COUNT ))
     if (( next_start < TOTAL_INFERENCE_JOBS )); then
-        next_end=$(( next_start + OUR_ARRAY_SIZE - 1 ))
+        max_array_size=$(utilities/determine_array_size.sh "$INFERENCE_PARTITION")
+        echo "Determined maximum array size $max_array_size for partition $INFERENCE_PARTITION"
+        next_end=$(( next_start + PARALLEL_TASKS * max_array_size - 1 ))
         if (( next_end >= TOTAL_INFERENCE_JOBS )); then
             next_end=$(( TOTAL_INFERENCE_JOBS - 1 ))
         fi

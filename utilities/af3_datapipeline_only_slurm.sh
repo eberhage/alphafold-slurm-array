@@ -22,13 +22,16 @@ export APPTAINER_TMPDIR=$WORKDIR/tmp/apptainer_${SLURM_ARRAY_JOB_ID}/${SLURM_ARR
 
 # --- Task 0 only: decide what’s next ---
 if [[ "$SLURM_ARRAY_TASK_ID" -eq 0 ]]; then
-    NEXT_OFFSET=$(( START_OFFSET + MAX_ARRAY_SIZE ))
+    NEXT_OFFSET=$(( START_OFFSET + SLURM_ARRAY_TASK_COUNT ))
 
     if (( NEXT_OFFSET < TOTAL_DATAPIPELINE_JOBS )); then
-        echo "Submitting next datapipeline batch starting at offset $NEXT_OFFSET"
+        max_array_size=$(utilities/determine_array_size.sh "$DATAPIPELINE_PARTITION")
+        echo "Determined maximum array size $max_array_size for partition $DATAPIPELINE_PARTITION"
+        next_array_size=$(( max_array_size < (TOTAL_DATAPIPELINE_JOBS - NEXT_OFFSET) ? max_array_size : (TOTAL_DATAPIPELINE_JOBS - NEXT_OFFSET) ))
+        echo "Submitting next datapipeline batch starting at offset $NEXT_OFFSET with actual array size $next_array_size."
         sbatch --dependency=afterok:${SLURM_ARRAY_JOB_ID} \
                --partition=${DATAPIPELINE_PARTITION} \
-               --array=0-$(( MAX_ARRAY_SIZE < (TOTAL_DATAPIPELINE_JOBS - NEXT_OFFSET) ? MAX_ARRAY_SIZE-1 : (TOTAL_DATAPIPELINE_JOBS - NEXT_OFFSET)-1 )) \
+               --array=0-$(( next_array_size - 1 )) \
                --export=ALL,START_OFFSET=$NEXT_OFFSET \
                $WORKDIR/utilities/af3_datapipeline_only_slurm.sh
     else

@@ -119,15 +119,6 @@ check_gres_in_partition() {
     return 1
 }
 
-
-slurm_limit_exceeded() {
-    max_time=$(scontrol show partition "$1" | awk 'match($0,/MaxTime=([^ ]+)/,a){print a[1]}')
-    [[ $max_time =~ infinite|UNLIMITED ]] && return 1
-    [[ $max_time == *-* ]] && days=${max_time%%-*} time_part=${max_time#*-} || days=0 time_part=$max_time
-    IFS=: read hours minutes seconds <<<"$time_part"
-    (( $2 > days*1440 + hours*60 + minutes ))
-}
-
 IFS=',' read -ra seed_array <<< "$SEEDS"
 num_seeds=${#seed_array[@]}
 IFS=',' read -ra GPU_PROFILES_ARRAY <<< "$GPU_PROFILES"
@@ -156,8 +147,9 @@ for profile in "${GPU_PROFILES_ARRAY[@]}"; do
         exit 1
     fi
     gpu_time=$(( max_minutes * num_seeds ))
-    if slurm_limit_exceeded "$INFERENCE_PARTITION" "$gpu_time"; then
-        echo "Error: Job time for profile '$profile' ($gpu_time minutes) exceeds MaxTime of partition '$INFERENCE_PARTITION'. Please reduce the number of seeds." >&2
+
+    if utilities/exceeds_wall_time.sh "$INFERENCE_PARTITION" "$gpu_time"; then
+        echo "Error: Job time for profile '$profile' ($gpu_time minutes) exceeds MaxTime of partition '$INFERENCE_PARTITION' or WallTime of QOS. Please reduce the number of seeds." >&2
         exit 1
     fi
 
@@ -237,33 +229,6 @@ case "$answer" in
         ;;
 esac
 
-MAX_ARRAY_SIZE_RAW=$(scontrol show config | awk -F= '/MaxArraySize/ {gsub(/ /,"",$2); print $2}')
-MAX_JOB_COUNT=$(scontrol show config | awk -F= '/MaxJobCount/ {gsub(/ /,"",$2); print $2}')
-
-# Validate values are integers
-if ! [[ "$MAX_ARRAY_SIZE_RAW" =~ ^[0-9]+$ && "$MAX_JOB_COUNT" =~ ^[0-9]+$ ]]; then
-    echo "Error: Could not determine MaxArraySize or MaxJobCount from Slurm config." >&2
-    exit 1
-fi
-
-# Compute 10% of MaxJobCount (integer floor)
-MAX_ARRAY_CAP=$(( MAX_JOB_COUNT / 10 ))
-
-# Choose the smaller value
-if (( MAX_ARRAY_SIZE_RAW < MAX_ARRAY_CAP )); then
-    export MAX_ARRAY_SIZE=$MAX_ARRAY_SIZE_RAW
-else
-    export MAX_ARRAY_SIZE=$MAX_ARRAY_CAP
-fi
-
-export OUR_ARRAY_SIZE=$(( (MAX_ARRAY_SIZE / RESULTS_PER_DIR) * RESULTS_PER_DIR ))
-
-if (( OUR_ARRAY_SIZE == 0 )); then
-    echo "ERROR: RESULTS_PER_DIR ($RESULTS_PER_DIR) is too large for MAX_ARRAY_SIZE ($MAX_ARRAY_SIZE)." >&2
-    exit 1
-
-fi
-
 # Run the Python script and capture how many JSONs were created
 created_jsons=$(python3 utilities/make_datapipeline_inputs.py)
 
@@ -288,7 +253,9 @@ if (( TOTAL_DATAPIPELINE_JOBS > 0 )); then
     fi
 
     # Submit only the first chunk; recursion handled inside af3_datapipeline_only_slurm.sh
-    sbatch --array=0-$(( MAX_ARRAY_SIZE < TOTAL_DATAPIPELINE_JOBS ? MAX_ARRAY_SIZE-1 : TOTAL_DATAPIPELINE_JOBS-1 )) \
+    max_array_size=$(utilities/determine_array_size.sh "$DATAPIPELINE_PARTITION")
+    echo "Determined maximum array size $max_array_size for partition $DATAPIPELINE_PARTITION"
+    sbatch --array=0-$(( max_array_size < TOTAL_DATAPIPELINE_JOBS ? max_array_size-1 : TOTAL_DATAPIPELINE_JOBS-1 )) \
            --partition=${DATAPIPELINE_PARTITION} \
            --export=ALL,START_OFFSET=0 \
            utilities/af3_datapipeline_only_slurm.sh

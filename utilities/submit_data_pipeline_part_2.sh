@@ -88,8 +88,10 @@ for profile in "${GPU_PROFILES_ARRAY[@]}"; do
         if (( adjusted_job_count < job_count )); then
             echo "Note: Reducing job count from $job_count to $adjusted_job_count due to parallel_tasks=$parallel_tasks."
         fi
-        first_chunk_size=$(( adjusted_job_count < OUR_ARRAY_SIZE ? adjusted_job_count : OUR_ARRAY_SIZE ))
-        echo "Submitting ${profile} inference jobs (0-$((first_chunk_size - 1))) with gres=$gres, gpus_per_task=$gpus_per_task and parallel_tasks=$parallel_tasks."
+        max_array_size=$(utilities/determine_array_size.sh "$INFERENCE_PARTITION")
+        echo "Determined maximum array size $max_array_size for partition $INFERENCE_PARTITION"
+        first_chunk_size=$(( adjusted_job_count < max_array_size ? adjusted_job_count : max_array_size ))
+        echo "Submitting ${profile} inference jobs (0-$((first_chunk_size - 1))) with gres=$gres, gpus_per_task=$gpus_per_task and ntasks=$parallel_tasks."
         sbatch --array=0-$(( first_chunk_size - 1 )) \
                --partition="${INFERENCE_PARTITION}" \
                --gres=${gres} \
