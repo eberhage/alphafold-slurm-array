@@ -5,21 +5,13 @@ WORKDIR=$(pwd)
 
 export INFERENCE_ID=$(( FIRST_INFERENCE_ID + SLURM_PROCID ))
 
-# Compute last theoretical inference ID covered by this array chunk
-last_array_inference_id=$(( START_OFFSET + PARALLEL_TASKS * (SLURM_ARRAY_TASK_MAX + 1) - 1 ))
-
-# Clamp to total job count
-global_last_id=$(( TOTAL_INFERENCE_JOBS - 1 ))
-if (( last_array_inference_id > global_last_id )); then
-    last_array_inference_id=$global_last_id
-fi
-
 # Compute start and end of the bucket
 bucket_start=$(( (INFERENCE_ID / RESULTS_PER_DIR) * RESULTS_PER_DIR ))
 bucket_end=$(( bucket_start + RESULTS_PER_DIR - 1 ))
-if (( bucket_end > last_array_inference_id )); then
-    bucket_end=$last_array_inference_id
-fi
+
+# Clamp to total job count
+global_last_id=$(( TOTAL_INFERENCE_JOBS - 1 ))
+(( bucket_end > global_last_id )) && bucket_end=$global_last_id
 
 user_input_file=$WORKDIR/pending_jobs/${PIPELINE_RUN_ID}/${GPU_PROFILE}/${INFERENCE_ID}_*.json
 AF3_input_file=$(basename $user_input_file)
