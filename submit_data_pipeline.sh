@@ -28,12 +28,19 @@ export GPU_PROFILES="40g-parallel,80g"
 # Datapipeline (MSA, template search) statistics file (simple CSV)
 export DATAPIPELINE_STATISTICS_FILE="datapipeline_statistics.csv"
 
-# Inference (protein structure prediction) statistics file (JSONL)
-export INFERENCE_STATISTICS_FILE="inference_statistics.jsonl"
+# Directory that will contain statistics about the inference (protein structure prediction) in JSON format.
+export INFERENCE_STATISTICS_DIR="inference_statistics"
 
-# Optional postprocessing script that runs after every inference job and has access to environment variables such as
-# INFERENCE_NAME, INFERENCE_DIR and INFERENCE_ID. Leave empty if no postprocessing should be done.
+# Optional postprocessing script that runs AFTER every instance of POSTPROCESSING_LEVEL and has access to environment variables.
+# Leave empty for no postprocessing.
+# The POSTPROCESSING_LEVEL determines at what stage of the pipeline postprocessing should be done. 
+# If you dont use parallelisation you should never use "job" but always "process" instead.
+# Options: 
+#       "array": Has access to environment variables PIPELINE_RUN_ID, GPU_PROFILE, FIRST_INFERENCE_ID, LAST_INFERENCE_ID (of the array)
+#       "job": Has access to environment variables PIPELINE_RUN_ID, GPU_PROFILE, FIRST_INFERENCE_ID, LAST_INFERENCE_ID (of the job)
+#       "process": Has access to environment variables PIPELINE_RUN_ID, GPU_PROFILE, INFERENCE_NAME, INFERENCE_DIR and INFERENCE_ID
 export POSTPROCESSING_SCRIPT="postprocessing_example.sh"
+export POSTPROCESSING_LEVEL="process"
 
 ###########################################################################################################################
                                                            

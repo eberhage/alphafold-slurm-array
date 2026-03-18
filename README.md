@@ -47,9 +47,10 @@ The following parameters are set inside submit_data_pipeline.sh:
 | `MAX_COMPOUND_ATOMS`           | Amount of explicit atoms that compounds from `SCREEN_FILE` can have to be included in the screening. |
 | `CLUSTER_CONFIG`               | Path to your cluster configuration JSON file (see [below](#cluster-configuration)). |
 | `GPU_PROFILES`                 | Comma-separated list of GPU profiles from cluster configuration to use for job assignment (e.g., `"40g,80g"`). |
-| `DATAPIPELINE_STATISTICS_FILE` | CSV file where statistics from the **data pipeline** stage will be stored (default: `datapipeline_statistics.csv`). |
-| `INFERENCE_STATISTICS_FILE`    | CSV file where statistics from the **inference** stage will be stored (default: `inference_statistics.csv`). |
-| `POSTPROCESSING_SCRIPT`        | Optional script that runs after each inference job. It has access to environment variables such as `INFERENCE_NAME`, `INFERENCE_DIR`, and `INFERENCE_ID`. Leave empty to disable. |
+| `DATAPIPELINE_STATISTICS_FILE` | CSV file where statistics from the **data pipeline** stage will be stored. |
+| `INFERENCE_STATISTICS_DIR`     | Directory where statistics from the **inference** stage will be stored in JSON format. |
+| `POSTPROCESSING_SCRIPT`        | Optional script that runs after a specified pipeline stage (see **POSTPROCESSING_LEVEL**). Leave empty to disable. |
+| `POSTPROCESSING_LEVEL`         | Determines when postprocessing is executed: <ul><li>`array`: runs once per array job (available variables: PIPELINE_RUN_ID, GPU_PROFILE, FIRST_INFERENCE_ID, LAST_INFERENCE_ID)</li><li>`job`: runs once per job (same variables as array but FIRST_INFERENCE_ID and LAST_INFERENCE_ID are with respect to the job, not the array; avoid if not using parallelisation)</li><li>`process`: runs per inference (variables: PIPELINE_RUN_ID, GPU_PROFILE, INFERENCE_NAME, INFERENCE_DIR, INFERENCE_ID)</li></ul> |
 
 ### Mode
 The behavior of the pipeline is controlled by the `MODE` parameter.

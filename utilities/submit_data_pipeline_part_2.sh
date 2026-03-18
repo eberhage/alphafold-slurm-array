@@ -90,16 +90,27 @@ for profile in "${GPU_PROFILES_ARRAY[@]}"; do
         fi
         max_array_size=$(utilities/determine_array_size.sh "$INFERENCE_PARTITION")
         echo "Determined maximum array size $max_array_size for partition $INFERENCE_PARTITION"
-        first_chunk_size=$(( adjusted_job_count < max_array_size ? adjusted_job_count : max_array_size ))
-        echo "Submitting ${profile} inference jobs (0-$((first_chunk_size - 1))) with gres=$gres, gpus_per_task=$gpus_per_task and ntasks=$parallel_tasks."
-        sbatch --array=0-$(( first_chunk_size - 1 )) \
-               --partition="${INFERENCE_PARTITION}" \
-               --gres=${gres} \
-               --gpus-per-task=${gpus_per_task} \
-               --time=${gpu_time} \
-               --ntasks=${parallel_tasks} \
-               --export=ALL,TOTAL_INFERENCE_JOBS=$job_count,START_OFFSET=0,GRES=$gres,GPU_PROFILE=$profile,GPUS_PER_TASK=$gpus_per_task,ENABLE_XLA=$enable_xla,GPU_TIME=$gpu_time,PARALLEL_TASKS=$parallel_tasks \
-               utilities/af3_inference_only_slurm.sh
+        first_array_size=$(( adjusted_job_count < max_array_size ? adjusted_job_count : max_array_size ))
+        first_inference_end=$(( first_array_size * parallel_tasks ))
+        (( first_inference_end > job_count )) && first_inference_end=$job_count
+        echo "Submitting ${profile} inference jobs (0-$((first_array_size - 1))) with gres=$gres, gpus_per_task=$gpus_per_task and ntasks=$parallel_tasks."
+        job_info=$(sbatch --array=0-$(( first_array_size - 1 )) \
+                          --partition="${INFERENCE_PARTITION}" \
+                          --gres=${gres} \
+                          --gpus-per-task=${gpus_per_task} \
+                          --time=${gpu_time} \
+                          --ntasks=${parallel_tasks} \
+                          --export=ALL,TOTAL_INFERENCE_JOBS=$job_count,START_OFFSET=0,GRES=$gres,GPU_PROFILE=$profile,GPUS_PER_TASK=$gpus_per_task,ENABLE_XLA=$enable_xla,GPU_TIME=$gpu_time,PARALLEL_TASKS=$parallel_tasks \
+                          --parsable \
+                          utilities/af3_inference_only_slurm.sh)
+
+        if [[ -n "${POSTPROCESSING_SCRIPT:-}" && -f "$POSTPROCESSING_SCRIPT" && "$POSTPROCESSING_LEVEL" == "array" ]]; then
+            sbatch --output="slurm-output/slurm-%j_%x.out" \
+                   --dependency=afterok:${job_info%%;*} \
+                   --export=ALL,GPU_PROFILE=$profile,FIRST_INFERENCE_ID=0,LAST_INFERENCE_ID=$first_inference_end \
+                   ${POSTPROCESSING_SCRIPT}
+            echo "Postprocessing on array level submitted. Dependency=afterok:${job_info%%;*}"
+        fi
     else
         echo "No jobs to submit for GPU profile '$profile'."
     fi

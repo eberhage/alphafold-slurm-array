@@ -6,19 +6,19 @@ WORKDIR=$(pwd)
 export INFERENCE_ID=$(( FIRST_INFERENCE_ID + SLURM_PROCID ))
 
 # Compute last theoretical inference ID covered by this array chunk
-last_inference_id=$(( START_OFFSET + PARALLEL_TASKS * (SLURM_ARRAY_TASK_MAX + 1) - 1 ))
+last_array_inference_id=$(( START_OFFSET + PARALLEL_TASKS * (SLURM_ARRAY_TASK_MAX + 1) - 1 ))
 
 # Clamp to total job count
 global_last_id=$(( TOTAL_INFERENCE_JOBS - 1 ))
-if (( last_inference_id > global_last_id )); then
-    last_inference_id=$global_last_id
+if (( last_array_inference_id > global_last_id )); then
+    last_array_inference_id=$global_last_id
 fi
 
 # Compute start and end of the bucket
 bucket_start=$(( (INFERENCE_ID / RESULTS_PER_DIR) * RESULTS_PER_DIR ))
 bucket_end=$(( bucket_start + RESULTS_PER_DIR - 1 ))
-if (( bucket_end > last_inference_id )); then
-    bucket_end=$last_inference_id
+if (( bucket_end > last_array_inference_id )); then
+    bucket_end=$last_array_inference_id
 fi
 
 user_input_file=$WORKDIR/pending_jobs/${PIPELINE_RUN_ID}/${GPU_PROFILE}/${INFERENCE_ID}_*.json
@@ -63,7 +63,7 @@ af_output=$(apptainer exec --writable-tmpfs --nv ${AF3_CONTAINER_PATH} python /a
 
 unset APPTAINER_BINDPATH
 
-if [[ -n "${INFERENCE_STATISTICS_FILE:-}" ]]; then
+if [[ -n "${INFERENCE_STATISTICS_DIR:-}" ]]; then
     end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     read bucket_size tokens < <(echo "$af_output" | awk '/Got bucket size/ {
         match($0, /Got bucket size ([0-9]+) for input with ([0-9]+)/, a);
@@ -105,12 +105,8 @@ if [[ -n "${INFERENCE_STATISTICS_FILE:-}" ]]; then
                 "af3_confidences": $confidences
             }')
 
-    mkdir -p "$(dirname "$INFERENCE_STATISTICS_FILE")"
-
-    (
-        flock -x -w 30 200 || exit 1
-        printf '%s\n' "$log_object" >> "$INFERENCE_STATISTICS_FILE"
-    ) 200>"$INFERENCE_STATISTICS_FILE.lock"
+    mkdir -p "$INFERENCE_STATISTICS_DIR"
+    echo "$log_object" > "$INFERENCE_STATISTICS_DIR"/${PIPELINE_RUN_ID}_${GPU_PROFILE}_${INFERENCE_ID}.json
 fi
 
 rm -rf $AF3_cache_path
@@ -118,7 +114,7 @@ rm -rf $APPTAINER_TMPDIR
 rm -rf $AF3_input_path
 
 # --- Postprocessing ---
-if [[ -n "${POSTPROCESSING_SCRIPT:-}" && -f "$POSTPROCESSING_SCRIPT" ]]; then
+if [[ -n "${POSTPROCESSING_SCRIPT:-}" && -f "$POSTPROCESSING_SCRIPT" && "$POSTPROCESSING_LEVEL" == "process" ]]; then
     sbatch --output="slurm-output/slurm-${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}_${SLURM_PROCID}-${SLURM_JOB_NAME}.out" \
            --open-mode=append \
            ${POSTPROCESSING_SCRIPT}
