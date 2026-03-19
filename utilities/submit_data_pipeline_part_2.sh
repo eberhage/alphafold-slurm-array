@@ -91,8 +91,8 @@ for profile in "${GPU_PROFILES_ARRAY[@]}"; do
         max_array_size=$(utilities/determine_array_size.sh "$INFERENCE_PARTITION")
         echo "Determined maximum array size $max_array_size for partition $INFERENCE_PARTITION"
         first_array_size=$(( adjusted_job_count < max_array_size ? adjusted_job_count : max_array_size ))
-        first_inference_end=$(( first_array_size * parallel_tasks ))
-        (( first_inference_end > job_count )) && first_inference_end=$job_count
+        first_inference_end=$(( first_array_size * parallel_tasks - 1))
+        (( first_inference_end >= job_count )) && first_inference_end=$(( job_count - 1 ))
         echo "Submitting ${profile} inference jobs (0-$((first_array_size - 1))) with gres=$gres, gpus_per_task=$gpus_per_task and ntasks=$parallel_tasks."
         job_info=$(sbatch --array=0-$(( first_array_size - 1 )) \
                           --partition="${INFERENCE_PARTITION}" \
